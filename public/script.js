@@ -13,7 +13,8 @@ const elements = {
     apiUrl: document.getElementById('apiUrl'),
     accuracy: document.getElementById('accuracy'),
     timeout: document.getElementById('timeout'),
-    maxAge: document.getElementById('maxAge')
+    maxAge: document.getElementById('maxAge'),
+    currentUrl: document.getElementById('currentUrl')
 };
 
 function log(message, type = 'info') {
@@ -41,26 +42,37 @@ function getLocationOptions() {
 
 async function sendLocationToAPI(locationData) {
     try {
+        log(`API URL: ${elements.apiUrl.value}`);
         log(`Sending to API: ${locationData.latitude.toFixed(6)}, ${locationData.longitude.toFixed(6)} (±${locationData.accuracy}m)`);
+        
+        const requestBody = {
+            location: locationData,
+            requestId: `web-${Date.now()}-${locationCount}`,
+            metadata: {
+                userAgent: navigator.userAgent,
+                connectionType: navigator.connection?.effectiveType || 'unknown',
+                timestamp: Date.now(),
+                platform: navigator.platform,
+                origin: window.location.origin
+            }
+        };
+        
+        log(`Request body: ${JSON.stringify(requestBody, null, 2)}`);
         
         const response = await fetch(elements.apiUrl.value, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                location: locationData,
-                requestId: `web-${Date.now()}-${locationCount}`,
-                metadata: {
-                    userAgent: navigator.userAgent,
-                    connectionType: navigator.connection?.effectiveType || 'unknown',
-                    timestamp: Date.now()
-                }
-            })
+            body: JSON.stringify(requestBody)
         });
 
+        log(`Response status: ${response.status} ${response.statusText}`);
+
         if (!response.ok) {
-            throw new Error(`API Error: ${response.status} ${response.statusText}`);
+            const errorText = await response.text();
+            log(`Response error: ${errorText}`);
+            throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorText}`);
         }
 
         const result = await response.json();
@@ -69,7 +81,10 @@ async function sendLocationToAPI(locationData) {
         return result;
 
     } catch (error) {
-        log(`API Error: ${error.message}`, 'error');
+        log(`Detailed API Error: ${error.name} - ${error.message}`, 'error');
+        if (error.stack) {
+            log(`Error stack: ${error.stack}`, 'error');
+        }
         showStatus(`Failed to send location to API: ${error.message}`, 'error');
         return null;
     }
@@ -82,7 +97,6 @@ function displayAPIResponse(result) {
 
     const { quality, processingTime } = result.data;
 
-    // Display quality score
     const qualityClass = `quality-${quality.grade}`;
     elements.qualityDisplay.innerHTML = `
         <div class="quality-score ${qualityClass}">
@@ -107,7 +121,6 @@ function displayAPIResponse(result) {
     `;
     elements.qualityDisplay.style.display = 'block';
 
-    // Display location data
     elements.locationDisplay.innerHTML = `
         <div class="location-data">${JSON.stringify(result.data, null, 2)}</div>
     `;
@@ -116,6 +129,15 @@ function displayAPIResponse(result) {
 
 function processLocationSuccess(position) {
     locationCount++;
+    
+    const userAgent = navigator.userAgent.toLowerCase();
+    let detectedPlatform = 'web';
+    
+    if (userAgent.includes('iphone') || userAgent.includes('ipad') || userAgent.includes('ios')) {
+        detectedPlatform = 'ios';
+    } else if (userAgent.includes('android')) {
+        detectedPlatform = 'android';
+    }
     
     const locationData = {
         latitude: position.coords.latitude,
@@ -126,14 +148,13 @@ function processLocationSuccess(position) {
         heading: position.coords.heading,
         altitude: position.coords.altitude,
         altitudeAccuracy: position.coords.altitudeAccuracy,
-        platform: 'web',
+        platform: detectedPlatform, 
         source: 'gps'
     };
 
     log(`Location #${locationCount}: ${locationData.latitude.toFixed(6)}, ${locationData.longitude.toFixed(6)} (±${locationData.accuracy}m)`);
     showStatus(`Location received (±${locationData.accuracy}m accuracy)`, 'success');
 
-    // Send to your API
     sendLocationToAPI(locationData);
 }
 
@@ -162,7 +183,6 @@ function processLocationError(error) {
     showStatus(message, type);
 }
 
-// Event Listeners
 elements.requestPermission.addEventListener('click', async () => {
     if (!navigator.geolocation) {
         showStatus('Geolocation is not supported by this browser', 'error');
@@ -237,6 +257,14 @@ function clearLogs() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    const currentOrigin = window.location.origin;
+    const apiUrl = `${currentOrigin}/api/v1/location/test`;
+    
+    elements.apiUrl.value = apiUrl;
+    elements.currentUrl.textContent = `API Endpoint: ${apiUrl}`;
+    
+    log(`Initialized with origin: ${currentOrigin}`);
+    log(`API URL set to: ${apiUrl}`);
     log('GeoGuardian location testing ready');
     showStatus('Click "Request Location Permission" to begin testing', 'info');
 });
