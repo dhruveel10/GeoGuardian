@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import locationRoutes from './routes/location';
 
 dotenv.config();
 
@@ -30,17 +31,20 @@ app.get('/api/v1/info', (req, res) => {
     endpoints: [
       'GET /health - Health check',
       'GET /api/v1/info - Service information',
-      'POST /api/v1/location/test - Test location endpoint (coming next)'
+      'POST /api/v1/location/test - Test location processing',
+      'GET /api/v1/location/example - Request/response examples'
     ],
     status: 'Development'
   });
 });
 
+app.use('/api/v1/location', locationRoutes);
+
 app.use((req, res, next) => {
   res.status(404).json({
     error: 'Endpoint not found',
     message: `${req.method} ${req.originalUrl} is not a valid endpoint`,
-    availableEndpoints: ['/health', '/api/v1/info']
+    availableEndpoints: ['/health', '/api/v1/info', '/api/v1/location/test', '/api/v1/location/example']
   });
 });
 
@@ -56,6 +60,7 @@ app.listen(PORT, () => {
   console.log(`🚀 GeoGuardian API running on http://localhost:${PORT}`);
   console.log(`📋 Health check: http://localhost:${PORT}/health`);
   console.log(`📖 API info: http://localhost:${PORT}/api/v1/info`);
+  console.log(`📍 Location test: http://localhost:${PORT}/api/v1/location/test`);
 });
 
 export default app;
