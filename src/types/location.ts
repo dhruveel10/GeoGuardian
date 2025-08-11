@@ -36,7 +36,7 @@ export interface LocationResponse {
 
 export interface LocationQuality {
   score: number;
-  grade: 'excellent' | 'good' | 'fair' | 'poor';
+  grade: 'excellent' | 'very-good' | 'good' | 'fair' | 'poor' | 'very-poor' | 'unusable';
   issues: string[];
   recommendations: string[];
 }

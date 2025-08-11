@@ -6,29 +6,32 @@ export class LocationAnalyzer {
     const recommendations: string[] = [];
     let score = 100;
 
-    if (location.accuracy > 100) {
-    issues.push('Very poor GPS accuracy - unreliable for geofencing');
-    recommendations.push('Move to an open area with clear sky view');
-    score -= 70;
-} else if (location.accuracy > 50) {
-    issues.push('Poor GPS accuracy - not suitable for precise location services');
-    recommendations.push('Move outdoors or near a window for better GPS signal');
-    score -= 55;
-} else if (location.accuracy > 30) {
-    issues.push('Moderate GPS accuracy - use with caution');
-    recommendations.push('Wait for GPS to stabilize or move to better location');
-    score -= 35;
-} else if (location.accuracy > 15) { 
-    issues.push('Fair GPS accuracy');
-    recommendations.push('Acceptable for most location services');
-    score -= 20;
-} else if (location.accuracy > 10) {
-    issues.push('Good GPS accuracy');
-    score -= 10;
-} else if (location.accuracy > 5) {
-    issues.push('Very good GPS accuracy');
-    score -= 5;
-}
+    if (location.accuracy > 200) {
+      issues.push('Extremely poor GPS accuracy - unusable for any precise location services');
+      recommendations.push('Move to an outdoor area with clear sky view and wait several minutes');
+      score -= 85;
+    } else if (location.accuracy > 100) {
+      issues.push('Very poor GPS accuracy - unreliable for geofencing');
+      recommendations.push('Move to an open area with clear sky view');
+      score -= 70;
+    } else if (location.accuracy > 50) {
+      issues.push('Poor GPS accuracy - not suitable for precise location services');
+      recommendations.push('Move outdoors or near a window for better GPS signal');
+      score -= 55;
+    } else if (location.accuracy > 30) {
+      issues.push('Moderate GPS accuracy - use with caution');
+      recommendations.push('Wait for GPS to stabilize or move to better location');
+      score -= 35;
+    } else if (location.accuracy > 15) {
+      issues.push('Fair GPS accuracy');
+      recommendations.push('Acceptable for most location services');
+      score -= 20;
+    } else if (location.accuracy > 10) {
+      issues.push('Good GPS accuracy');
+      score -= 10;
+    } else if (location.accuracy > 5) {
+      score -= 5;
+    }
 
     const now = Date.now();
     const ageMinutes = (now - location.timestamp) / (1000 * 60);
@@ -73,13 +76,19 @@ export class LocationAnalyzer {
 
     let grade: LocationQuality['grade'];
     if (score >= 90) {
-      grade = 'excellent'; 
-    } else if (score >= 70) {
-      grade = 'good';       
-    } else if (score >= 40) {
-      grade = 'fair';      
+      grade = 'excellent';      
+    } else if (score >= 80) {
+      grade = 'very-good';      
+    } else if (score >= 65) {
+      grade = 'good';           
+    } else if (score >= 50) {
+      grade = 'fair';          
+    } else if (score >= 35) {
+      grade = 'poor';           
+    } else if (score >= 25) {
+      grade = 'very-poor';      
     } else {
-      grade = 'poor';      
+      grade = 'unusable';      
     }
 
     if (score < 35) {
