@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import locationRoutes from './routes/location';
+import movementRoutes from './routes/movementAnalysis';
 
 dotenv.config();
 
@@ -23,31 +24,51 @@ app.get('/health', (req, res) => {
     status: 'OK',
     timestamp: new Date().toISOString(),
     service: 'GeoGuardian API',
-    version: '1.0.0'
+    version: '2.0.0'
   });
 });
 
 app.get('/api/v1/info', (req, res) => {
   res.json({
     service: 'GeoGuardian Location Filtering API',
-    version: '1.0.0',
+    version: '2.0.0',
     endpoints: [
       'GET /health - Health check',
       'GET /api/v1/info - Service information',
-      'POST /api/v1/location/test - Test location processing',
+      'POST /api/v1/location/test - Single location quality analysis',
+      'POST /api/v1/location/analyze-movement - Movement anomaly detection',
+      'GET /api/v1/location/movement-limits - Speed limits for transport modes',
+      'POST /api/v1/location/batch-movement-analysis - Analyze location sequences',
       'GET /api/v1/location/example - Request/response examples'
+    ],
+    features: [
+      'Location quality analysis',
+      'Movement anomaly detection',
+      'GPS jump detection', 
+      'Impossible speed validation',
+      'Transport mode awareness',
+      'Batch sequence analysis'
     ],
     status: 'Development'
   });
 });
 
 app.use('/api/v1/location', locationRoutes);
+app.use('/api/v1/location', movementRoutes);
 
 app.use((req, res, next) => {
   res.status(404).json({
     error: 'Endpoint not found',
     message: `${req.method} ${req.originalUrl} is not a valid endpoint`,
-    availableEndpoints: ['/health', '/api/v1/info', '/api/v1/location/test', '/api/v1/location/example']
+    availableEndpoints: [
+      '/health',
+      '/api/v1/info',
+      '/api/v1/location/test',
+      '/api/v1/location/analyze-movement',
+      '/api/v1/location/movement-limits',
+      '/api/v1/location/batch-movement-analysis',
+      '/api/v1/location/example'
+    ]
   });
 });
 
@@ -60,10 +81,10 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 GeoGuardian API running on http://localhost:${PORT}`);
+  console.log(`🚀 GeoGuardian API v2.0 running on http://localhost:${PORT}`);
   console.log(`📋 Health check: http://localhost:${PORT}/health`);
   console.log(`📖 API info: http://localhost:${PORT}/api/v1/info`);
-  console.log(`📍 Location test: http://localhost:${PORT}/api/v1/location/test`);
+  console.log(`🏃 Movement analysis: http://localhost:${PORT}/api/v1/location/analyze-movement`);
 });
 
 export default app;
