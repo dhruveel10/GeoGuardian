@@ -9,7 +9,7 @@ import movementRoutes from './routes/movementAnalysis';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
 
 app.use(helmet({
   contentSecurityPolicy: false 
