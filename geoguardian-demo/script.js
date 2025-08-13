@@ -1,41 +1,44 @@
+let previousLocation = null;
+let qualityTrackingInterval = null;
+let movementTrackingInterval = null;
 let batchTrackingInterval = null;
 let countdownInterval = null;
 let batchNumber = 0;
-let previousLocation = null;
 let totalDistance = 0;
-let batchStats = {
-    total: 0,
-    normal: 0,
-    warning: 0,
-    anomaly: 0
-};
+let batchStats = { total: 0, normal: 0, warning: 0, anomaly: 0 };
 
 const elements = {
     requestPermission: document.getElementById('requestPermission'),
+    status: document.getElementById('status'),
+    logs: document.getElementById('logs'),
+    
+    testQuality: document.getElementById('testQuality'),
+    startQualityTracking: document.getElementById('startQualityTracking'),
+    stopQualityTracking: document.getElementById('stopQualityTracking'),
+    qualityDisplay: document.getElementById('qualityDisplay'),
+    qualityResult: document.getElementById('qualityResult'),
+    
+    testMovement: document.getElementById('testMovement'),
+    startMovementTracking: document.getElementById('startMovementTracking'),
+    stopMovementTracking: document.getElementById('stopMovementTracking'),
+    movementTransportMode: document.getElementById('movementTransportMode'),
+    movementEnvironment: document.getElementById('movementEnvironment'),
+    movementDisplay: document.getElementById('movementDisplay'),
+    movementResult: document.getElementById('movementResult'),
+    
     startBatchTracking: document.getElementById('startBatchTracking'),
     stopBatchTracking: document.getElementById('stopBatchTracking'),
-    transportMode: document.getElementById('transportMode'),
-    environment: document.getElementById('environment'),
+    batchTransportMode: document.getElementById('batchTransportMode'),
+    batchEnvironment: document.getElementById('batchEnvironment'),
     batchInterval: document.getElementById('batchInterval'),
     countdown: document.getElementById('countdown'),
     countdownValue: document.getElementById('countdownValue'),
-    status: document.getElementById('status'),
-    stats: document.getElementById('stats'),
+    batchStats: document.getElementById('batchStats'),
     batchContainer: document.getElementById('batchContainer'),
-    logs: document.getElementById('logs'),
     totalBatches: document.getElementById('totalBatches'),
     normalBatches: document.getElementById('normalBatches'),
     anomalyBatches: document.getElementById('anomalyBatches'),
     totalDistance: document.getElementById('totalDistance')
-};
-
-const SPEED_LIMITS = {
-    walking: 8,
-    running: 20,
-    cycling: 40,
-    driving: 120,
-    stationary: 0.5,
-    unknown: 50
 };
 
 function log(message, type = 'info') {
@@ -53,28 +56,51 @@ function showStatus(message, type = 'info') {
     elements.status.style.display = 'block';
 }
 
-function updateStats() {
-    elements.totalBatches.textContent = batchStats.total;
-    elements.normalBatches.textContent = batchStats.normal;
-    elements.anomalyBatches.textContent = batchStats.anomaly + batchStats.warning;
-    elements.totalDistance.textContent = Math.round(totalDistance) + 'm';
-    elements.stats.style.display = 'block';
+function showDemo(demoType) {
+    document.querySelectorAll('.demo-section').forEach(section => {
+        section.classList.remove('active');
+    });
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.classList.remove('active');
+    });
+    
+    document.getElementById(demoType + 'Demo').classList.add('active');
+    event.target.classList.add('active');
+    
+    log(`Switched to ${demoType} demo`);
 }
 
-function startCountdown(seconds) {
-    let remaining = seconds;
-    elements.countdownValue.textContent = remaining;
-    elements.countdown.style.display = 'block';
-    
-    countdownInterval = setInterval(() => {
-        remaining--;
-        elements.countdownValue.textContent = remaining;
-        
-        if (remaining <= 0) {
-            clearInterval(countdownInterval);
-            elements.countdown.style.display = 'none';
+function detectPlatform() {
+    const userAgent = navigator.userAgent.toLowerCase();
+    if (userAgent.includes('iphone') || userAgent.includes('ipad') || userAgent.includes('ios')) {
+        return 'ios';
+    } else if (userAgent.includes('android')) {
+        return 'android';
+    }
+    return 'web';
+}
+
+function collectDeviceInfo() {
+    return {
+        platform: detectPlatform(),
+        osVersion: navigator.platform,
+        connectionType: navigator.connection?.effectiveType || 'unknown',
+        userAgent: navigator.userAgent
+    };
+}
+
+async function getBatteryInfo() {
+    try {
+        if ('getBattery' in navigator) {
+            const battery = await navigator.getBattery();
+            return {
+                level: Math.round(battery.level * 100),
+                charging: battery.charging
+            };
         }
-    }, 1000);
+    } catch (error) {
+        return null;
+    }
 }
 
 async function collectLocationReading() {
@@ -110,149 +136,244 @@ async function collectLocationReading() {
     });
 }
 
-function detectPlatform() {
-    const userAgent = navigator.userAgent.toLowerCase();
-    if (userAgent.includes('iphone') || userAgent.includes('ipad') || userAgent.includes('ios')) {
-        return 'ios';
-    } else if (userAgent.includes('android')) {
-        return 'android';
+async function testSignalQuality() {
+    try {
+        showStatus('Testing signal quality...', 'info');
+        const location = await collectLocationReading();
+        
+        const response = await fetch(`${window.location.origin}/api/v1/location/test`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                location: location,
+                requestId: `quality-${Date.now()}`,
+                metadata: {
+                    batteryLevel: (await getBatteryInfo())?.level,
+                    connectionType: navigator.connection?.effectiveType
+                }
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.status}`);
+        }
+
+        const result = await response.json();
+        displayQualityResult(result);
+        log(`Quality test: ${result.data.quality.score}/100 (${result.data.quality.grade})`);
+        showStatus('Signal quality analysis complete', 'success');
+
+    } catch (error) {
+        log(`Quality test failed: ${error.message}`, 'error');
+        showStatus(`Quality test failed: ${error.message}`, 'error');
     }
-    return 'web';
 }
 
-function collectDeviceInfo() {
-  return {
-    platform: detectPlatform(),
-    osVersion: navigator.platform,
-    batteryLevel: navigator.getBattery ? undefined : undefined,
-    connectionType: navigator.connection?.effectiveType || 'unknown',
-    userAgent: navigator.userAgent
-  };
-}
+async function testMovementAnalysis() {
+    try {
+        if (!previousLocation) {
+            previousLocation = await collectLocationReading();
+            showStatus('First location captured. Move and test again.', 'info');
+            log('First location captured for movement analysis');
+            return;
+        }
 
-async function getBatteryInfo() {
-  try {
-    if ('getBattery' in navigator) {
-      const battery = await navigator.getBattery();
-      return {
-        level: Math.round(battery.level * 100),
-        charging: battery.charging
-      };
+        showStatus('Analyzing movement...', 'info');
+        const currentLocation = await collectLocationReading();
+        const batteryInfo = await getBatteryInfo();
+
+        const response = await fetch(`${window.location.origin}/api/v1/location/analyze-movement`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                previousLocation: previousLocation,
+                currentLocation: currentLocation,
+                contextHints: {
+                    transportMode: elements.movementTransportMode.value,
+                    environment: elements.movementEnvironment.value
+                },
+                deviceInfo: {
+                    ...collectDeviceInfo(),
+                    batteryLevel: batteryInfo?.level
+                },
+                requestId: `movement-${Date.now()}`
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.status}`);
+        }
+
+        const result = await response.json();
+        displayMovementResult(result);
+        
+        const status = result.data.accepted ? 'accepted' : 'rejected';
+        log(`Movement ${status}: ${result.data.distance}m, ${result.data.impliedSpeed} km/h`);
+        showStatus('Movement analysis complete', 'success');
+        
+        previousLocation = currentLocation;
+
+    } catch (error) {
+        log(`Movement analysis failed: ${error.message}`, 'error');
+        showStatus(`Movement analysis failed: ${error.message}`, 'error');
     }
-  } catch (error) {
-    return null;
-  }
 }
 
 async function analyzeBatchMovement(fromLocation, toLocation, batchNum) {
-  try {
-    const apiUrl = `https://geoguardian-pa0d.onrender.com/api/v1/location/analyze-movement`;
-    
-    const batteryInfo = await getBatteryInfo();
-    
-    const requestBody = {
-      previousLocation: fromLocation,
-      currentLocation: toLocation,
-      contextHints: {
-        transportMode: elements.transportMode.value,
-        environment: elements.environment.value
-      },
-      deviceInfo: {
-        ...collectDeviceInfo(),
-        batteryLevel: batteryInfo?.level,
-        isCharging: batteryInfo?.charging
-      },
-      requestId: `batch-${batchNum}-${Date.now()}`
-    };
-    
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody)
-    });
+    try {
+        const batteryInfo = await getBatteryInfo();
+        
+        const response = await fetch(`${window.location.origin}/api/v1/location/analyze-movement`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                previousLocation: fromLocation,
+                currentLocation: toLocation,
+                contextHints: {
+                    transportMode: elements.batchTransportMode.value,
+                    environment: elements.batchEnvironment.value
+                },
+                deviceInfo: {
+                    ...collectDeviceInfo(),
+                    batteryLevel: batteryInfo?.level
+                },
+                requestId: `batch-${batchNum}-${Date.now()}`
+            })
+        });
 
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.status}`);
+        }
+
+        const result = await response.json();
+        return result.data;
+
+    } catch (error) {
+        log(`Batch ${batchNum} API Error: ${error.message}`, 'error');
+        return null;
     }
+}
 
-    const result = await response.json();
-    return result.data;
+function displayQualityResult(result) {
+    if (!result.success || !result.data) return;
 
-  } catch (error) {
-    log(`Batch ${batchNum} API Error: ${error.message}`, 'error');
-    return null;
-  }
+    const { quality, processingTime } = result.data;
+    
+    const qualityClass = `quality-${quality.grade}`;
+    elements.qualityDisplay.innerHTML = `
+        <div class="quality-score ${qualityClass}">
+            <div>
+                <strong>GPS Quality: ${quality.grade.toUpperCase()}</strong>
+                <div style="font-size: 14px; margin-top: 4px;">
+                    Processing: ${processingTime}ms | Accuracy: ±${Math.round(result.data.processed.accuracy)}m
+                </div>
+                ${quality.issues.length > 0 ? 
+                    `<div style="font-size: 12px; margin-top: 8px;">
+                        Issues: ${quality.issues.join(', ')}
+                    </div>` : ''
+                }
+                ${quality.recommendations.length > 0 ? 
+                    `<div style="font-size: 12px; margin-top: 4px;">
+                        Tips: ${quality.recommendations.join(', ')}
+                    </div>` : ''
+                }
+            </div>
+            <div class="score-circle">${quality.score}</div>
+        </div>
+    `;
+    elements.qualityDisplay.style.display = 'block';
+    
+    elements.qualityResult.innerHTML = JSON.stringify(result, null, 2);
+    elements.qualityResult.style.display = 'block';
+}
+
+function displayMovementResult(result) {
+    if (!result.success || !result.data) return;
+
+    const analysis = result.data;
+    const statusIcon = analysis.accepted ? '✅' : '❌';
+    const riskColor = analysis.metadata.riskLevel === 'high' ? '#dc2626' : 
+                     analysis.metadata.riskLevel === 'medium' ? '#f59e0b' : '#16a34a';
+
+    elements.movementDisplay.innerHTML = `
+        <div style="border: 2px solid ${riskColor}; border-radius: 8px; padding: 16px; margin: 16px 0;">
+            <div style="font-size: 18px; font-weight: bold; margin-bottom: 8px;">
+                ${statusIcon} Movement Analysis Result
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                <div>
+                    <strong>Distance:</strong> ${Math.round(analysis.distance)}m<br>
+                    <strong>Speed:</strong> ${analysis.impliedSpeed} km/h<br>
+                    <strong>Risk:</strong> ${analysis.metadata.riskLevel.toUpperCase()}
+                </div>
+                <div>
+                    <strong>Platform:</strong> ${analysis.platformAnalysis.detectedPlatform}<br>
+                    <strong>Signal:</strong> ${analysis.qualityFactors.signalQuality}<br>
+                    <strong>Reliability:</strong> ${Math.round(analysis.qualityFactors.overallReliability * 100)}%
+                </div>
+            </div>
+            <div style="margin-top: 12px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 4px;">
+                <strong>Analysis:</strong> ${analysis.reason}
+            </div>
+        </div>
+    `;
+    elements.movementDisplay.style.display = 'block';
+    
+    elements.movementResult.innerHTML = JSON.stringify(result, null, 2);
+    elements.movementResult.style.display = 'block';
 }
 
 function displayBatchResult(batchNum, fromLocation, toLocation, analysis) {
-  if (!analysis) return;
+    if (!analysis) return;
 
-  const classification = classifyBatchResult(analysis);
-  const distance = analysis.distance || 0;
-  
-  totalDistance += distance;
-  batchStats.total++;
-  batchStats[classification.type]++;
-  updateStats();
+    const classification = classifyBatchResult(analysis);
+    const distance = analysis.distance || 0;
+    
+    totalDistance += distance;
+    batchStats.total++;
+    batchStats[classification.type]++;
+    updateBatchStats();
 
-  const startTime = new Date(Date.now() - (parseInt(elements.batchInterval.value) * 1000));
-  const endTime = new Date();
-  
-  const batchElement = document.createElement('div');
-  batchElement.className = `batch ${classification.type}`;
-  
-  const statusIcon = classification.type === 'normal' ? '✅' : 
-                    classification.type === 'warning' ? '⚠️' : '❌';
-  
-  const platformInfo = analysis.platformAnalysis ? 
-    `${analysis.platformAnalysis.detectedPlatform.toUpperCase()}` : 'Unknown';
-  
-  const qualityInfo = analysis.qualityFactors ? 
-    `${analysis.qualityFactors.signalQuality} signal, ${Math.round(analysis.qualityFactors.overallReliability * 100)}% reliable` : '';
-  
-  const riskInfo = analysis.metadata?.riskLevel ? 
-    `Risk: ${analysis.metadata.riskLevel.toUpperCase()}` : '';
+    const statusIcon = classification.type === 'normal' ? '✅' : 
+                      classification.type === 'warning' ? '⚠️' : '❌';
+    
+    const platformInfo = analysis.platformAnalysis ? 
+        `${analysis.platformAnalysis.detectedPlatform.toUpperCase()}` : 'Unknown';
+    
+    const qualityInfo = analysis.qualityFactors ? 
+        `${analysis.qualityFactors.signalQuality} signal, ${Math.round(analysis.qualityFactors.overallReliability * 100)}% reliable` : '';
+    
+    const riskInfo = analysis.metadata?.riskLevel ? 
+        `Risk: ${analysis.metadata.riskLevel.toUpperCase()}` : '';
 
-  batchElement.innerHTML = `
-    <div class="batch-header">
-      ${statusIcon} Batch #${batchNum} [${startTime.toLocaleTimeString()} → ${endTime.toLocaleTimeString()}]
-    </div>
-    <div class="batch-details">
-      Distance: ${Math.round(distance)}m | Speed: ${analysis.impliedSpeed?.toFixed(1) || 0} km/h | Time: ${analysis.timeElapsed?.toFixed(1) || 0}s
-    </div>
-    <div class="batch-details">
-      Platform: ${platformInfo} | ${qualityInfo} | ${riskInfo}
-    </div>
-    <div class="batch-details">
-      From: ${fromLocation.latitude.toFixed(6)}, ${fromLocation.longitude.toFixed(6)} (±${Math.round(fromLocation.accuracy)}m)
-    </div>
-    <div class="batch-details">
-      To: ${toLocation.latitude.toFixed(6)}, ${toLocation.longitude.toFixed(6)} (±${Math.round(toLocation.accuracy)}m)
-    </div>
-    <div class="batch-status">
-      ${classification.reason}
-      ${analysis.platformAnalysis?.platformSpecificIssues?.length > 0 ? 
-        ` | Platform issues: ${analysis.platformAnalysis.platformSpecificIssues.join(', ')}` : ''}
-    </div>
-  `;
-  
-  elements.batchContainer.insertBefore(batchElement, elements.batchContainer.firstChild);
-  elements.batchContainer.style.display = 'block';
+    const batchElement = document.createElement('div');
+    batchElement.className = `batch ${classification.type}`;
+    
+    batchElement.innerHTML = `
+        <div class="batch-header">
+            ${statusIcon} Batch #${batchNum} [${new Date().toLocaleTimeString()}]
+        </div>
+        <div class="batch-details">
+            Distance: ${Math.round(distance)}m | Speed: ${analysis.impliedSpeed?.toFixed(1) || 0} km/h | Time: ${analysis.timeElapsed?.toFixed(1) || 0}s
+        </div>
+        <div class="batch-details">
+            Platform: ${platformInfo} | ${qualityInfo} | ${riskInfo}
+        </div>
+        <div class="batch-details">
+            ${classification.reason}
+        </div>
+    `;
+    
+    elements.batchContainer.insertBefore(batchElement, elements.batchContainer.firstChild);
+    elements.batchContainer.style.display = 'block';
 }
 
-function calculateDistance(loc1, loc2) {
-    const R = 6371e3; 
-    const φ1 = loc1.latitude * Math.PI/180;
-    const φ2 = loc2.latitude * Math.PI/180;
-    const Δφ = (loc2.latitude-loc1.latitude) * Math.PI/180;
-    const Δλ = (loc2.longitude-loc1.longitude) * Math.PI/180;
-
-    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ/2) * Math.sin(Δλ/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-
-    return R * c;
+function updateBatchStats() {
+    elements.totalBatches.textContent = batchStats.total;
+    elements.normalBatches.textContent = batchStats.normal;
+    elements.anomalyBatches.textContent = batchStats.anomaly + batchStats.warning;
+    elements.totalDistance.textContent = Math.round(totalDistance) + 'm';
+    elements.batchStats.style.display = 'block';
 }
 
 function classifyBatchResult(analysis) {
@@ -260,7 +381,14 @@ function classifyBatchResult(analysis) {
         return { type: 'anomaly', reason: 'API analysis failed' };
     }
 
-    const transportMode = elements.transportMode.value;
+    const transportMode = elements.batchTransportMode.value;
+    const SPEED_LIMITS = {
+        walking: 8,
+        cycling: 40,
+        driving: 120,
+        stationary: 0.5,
+        unknown: 50
+    };
 
     if (!analysis.accepted) {
         if (analysis.anomalyType === 'teleportation' || 
@@ -283,6 +411,22 @@ function classifyBatchResult(analysis) {
     return { type: 'normal', reason: `Normal movement: ${analysis.impliedSpeed.toFixed(1)} km/h` };
 }
 
+function startCountdown(seconds) {
+    let remaining = seconds;
+    elements.countdownValue.textContent = remaining;
+    elements.countdown.style.display = 'block';
+    
+    countdownInterval = setInterval(() => {
+        remaining--;
+        elements.countdownValue.textContent = remaining;
+        
+        if (remaining <= 0) {
+            clearInterval(countdownInterval);
+            elements.countdown.style.display = 'none';
+        }
+    }, 1000);
+}
+
 async function processBatchReading() {
     try {
         showStatus('Collecting location reading...', 'info');
@@ -298,7 +442,7 @@ async function processBatchReading() {
         } else {
             log('First location reading - no movement to analyze');
             batchStats.total++;
-            updateStats();
+            updateBatchStats();
         }
         
         previousLocation = currentLocation;
@@ -330,12 +474,70 @@ elements.requestPermission.addEventListener('click', async () => {
         await collectLocationReading();
         log('Location permission granted');
         showStatus('Location permission granted!', 'success');
+        
         elements.requestPermission.disabled = true;
+        elements.testQuality.disabled = false;
+        elements.startQualityTracking.disabled = false;
+        elements.testMovement.disabled = false;
+        elements.startMovementTracking.disabled = false;
         elements.startBatchTracking.disabled = false;
     } catch (error) {
         log(`Permission error: ${error.message}`);
         showStatus(`Permission error: ${error.message}`, 'error');
     }
+});
+
+elements.testQuality.addEventListener('click', testSignalQuality);
+elements.testMovement.addEventListener('click', testMovementAnalysis);
+
+elements.startQualityTracking.addEventListener('click', () => {
+    log('Starting quality monitoring...');
+    showStatus('Starting continuous quality monitoring...', 'info');
+    
+    qualityTrackingInterval = setInterval(() => {
+        testSignalQuality();
+    }, 5000);
+    
+    elements.startQualityTracking.disabled = true;
+    elements.stopQualityTracking.disabled = false;
+});
+
+elements.stopQualityTracking.addEventListener('click', () => {
+    if (qualityTrackingInterval) {
+        clearInterval(qualityTrackingInterval);
+        qualityTrackingInterval = null;
+    }
+    
+    log('Quality monitoring stopped');
+    showStatus('Quality monitoring stopped', 'info');
+    
+    elements.startQualityTracking.disabled = false;
+    elements.stopQualityTracking.disabled = true;
+});
+
+elements.startMovementTracking.addEventListener('click', () => {
+    log('Starting movement tracking...');
+    showStatus('Starting continuous movement tracking...', 'info');
+    
+    movementTrackingInterval = setInterval(() => {
+        testMovementAnalysis();
+    }, 8000);
+    
+    elements.startMovementTracking.disabled = true;
+    elements.stopMovementTracking.disabled = false;
+});
+
+elements.stopMovementTracking.addEventListener('click', () => {
+    if (movementTrackingInterval) {
+        clearInterval(movementTrackingInterval);
+        movementTrackingInterval = null;
+    }
+    
+    log('Movement tracking stopped');
+    showStatus('Movement tracking stopped', 'info');
+    
+    elements.startMovementTracking.disabled = false;
+    elements.stopMovementTracking.disabled = true;
 });
 
 elements.startBatchTracking.addEventListener('click', () => {
@@ -358,8 +560,8 @@ elements.startBatchTracking.addEventListener('click', () => {
     
     elements.startBatchTracking.disabled = true;
     elements.stopBatchTracking.disabled = false;
-    elements.transportMode.disabled = true;
-    elements.environment.disabled = true;
+    elements.batchTransportMode.disabled = true;
+    elements.batchEnvironment.disabled = true;
     elements.batchInterval.disabled = true;
 });
 
@@ -381,8 +583,8 @@ elements.stopBatchTracking.addEventListener('click', () => {
     
     elements.startBatchTracking.disabled = false;
     elements.stopBatchTracking.disabled = true;
-    elements.transportMode.disabled = false;
-    elements.environment.disabled = false;
+    elements.batchTransportMode.disabled = false;
+    elements.batchEnvironment.disabled = false;
     elements.batchInterval.disabled = false;
 });
 
@@ -391,6 +593,6 @@ function clearLogs() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    log('GeoGuardian 10-second batch movement analysis ready');
-    showStatus('Click "Request Location Permission" to begin testing', 'info');
+    log('GeoGuardian API Demo ready');
+    showStatus('Click "Request Location Permission" to begin testing all API endpoints', 'info');
 });

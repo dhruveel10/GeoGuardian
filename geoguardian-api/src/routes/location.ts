@@ -49,7 +49,6 @@ router.post('/test', (req, res) => {
     } as LocationResponse);
 
   } catch (error) {
-    const processingTime = Date.now() - startTime;
     console.error('Location processing error:', error);
     
     res.status(500).json({
@@ -58,42 +57,6 @@ router.post('/test', (req, res) => {
       requestId: req.body?.requestId
     } as LocationResponse);
   }
-});
-
-router.get('/example', (req, res) => {
-  res.json({
-    endpoint: 'POST /api/v1/location/test',
-    description: 'Test location processing and quality analysis',
-    exampleRequest: {
-      location: {
-        latitude: 40.7128,
-        longitude: -74.0060,
-        accuracy: 15,
-        timestamp: Date.now(),
-        speed: 0,
-        platform: 'ios'
-      },
-      requestId: 'test-123',
-      metadata: {
-        batteryLevel: 85,
-        connectionType: 'wifi'
-      }
-    },
-    expectedResponse: {
-      success: true,
-      data: {
-        received: '/* original location */',
-        processed: '/* sanitized location */',
-        quality: {
-          score: 90,
-          grade: 'excellent',
-          issues: [],
-          recommendations: []
-        },
-        processingTime: 5
-      }
-    }
-  });
 });
 
 export default router;
