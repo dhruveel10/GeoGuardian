@@ -1,5 +1,12 @@
 import { LocationReading } from "./location";
 
+export interface MovementAnalysisResponse {
+  success: boolean;
+  data?: MovementAnalysisResult;
+  error?: string;
+  requestId?: string;
+}
+
 export interface MovementAnalysisRequest {
   previousLocation: LocationReading;
   currentLocation: LocationReading;
@@ -7,6 +14,13 @@ export interface MovementAnalysisRequest {
   contextHints?: {
     transportMode?: 'walking' | 'cycling' | 'driving' | 'flying' | 'stationary' | 'unknown';
     environment?: 'urban' | 'highway' | 'indoor' | 'rural' | 'outdoor' | 'unknown';
+  };
+  deviceInfo?: {
+    platform?: 'ios' | 'android' | 'web' | 'unknown';
+    osVersion?: string;
+    batteryLevel?: number;
+    connectionType?: string;
+    userAgent?: string;
   };
   requestId?: string;
 }
@@ -21,16 +35,27 @@ export interface MovementAnalysisResult {
   confidence: number;
   reason: string;
   recommendation: string;
+  platformAnalysis: {
+    detectedPlatform: string;
+    platformSpecificIssues: string[];
+    platformAdjustments: string[];
+  };
+  qualityFactors: {
+    signalQuality: 'excellent' | 'good' | 'fair' | 'poor';
+    consistency: number;
+    environmentSuitability: number;
+    overallReliability: number;
+  };
+  contextualInsights: {
+    movementPattern: 'stationary' | 'slow' | 'moderate' | 'fast' | 'erratic';
+    environmentalFactors: string[];
+    recommendations: string[];
+  };
   metadata: {
     processingTime: number;
     maxAllowedSpeed: number;
     actualSpeedRatio: number;
+    analysisVersion: string;
+    riskLevel: 'low' | 'medium' | 'high';
   };
-}
-
-export interface MovementAnalysisResponse {
-  success: boolean;
-  data?: MovementAnalysisResult;
-  error?: string;
-  requestId?: string;
 }

@@ -61,16 +61,6 @@ function updateStats() {
     elements.stats.style.display = 'block';
 }
 
-function detectPlatform() {
-    const userAgent = navigator.userAgent.toLowerCase();
-    if (userAgent.includes('iphone') || userAgent.includes('ipad') || userAgent.includes('ios')) {
-        return 'ios';
-    } else if (userAgent.includes('android')) {
-        return 'android';
-    }
-    return 'web';
-}
-
 function startCountdown(seconds) {
     let remaining = seconds;
     elements.countdownValue.textContent = remaining;
@@ -120,61 +110,138 @@ async function collectLocationReading() {
     });
 }
 
-// Add this debug function to your script.js to check what values are being sent
-async function analyzeBatchMovement(fromLocation, toLocation, batchNum) {
-    try {
-        const apiUrl = `https://geoguardian-pa0d.onrender.com/api/v1/location/analyze-movement`;
-        
-        const requestBody = {
-            previousLocation: fromLocation,
-            currentLocation: toLocation,
-            contextHints: {
-                transportMode: elements.transportMode.value,
-                environment: elements.environment.value
-            },
-            requestId: `batch-${batchNum}-${Date.now()}`
-        };
-        
-        // DEBUG: Log what we're sending to the API
-        console.log('Sending to API:', {
-            transportMode: elements.transportMode.value,
-            environment: elements.environment.value,
-            distance: Math.round(calculateDistance(fromLocation, toLocation)) + 'm'
-        });
-        
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestBody)
-        });
-
-        if (!response.ok) {
-            throw new Error(`API Error: ${response.status}`);
-        }
-
-        const result = await response.json();
-        
-        // DEBUG: Log what API returned
-        console.log('API Response:', {
-            accepted: result.data.accepted,
-            anomalyType: result.data.anomalyType,
-            reason: result.data.reason,
-            impliedSpeed: result.data.impliedSpeed
-        });
-        
-        return result.data;
-
-    } catch (error) {
-        log(`Batch ${batchNum} API Error: ${error.message}`, 'error');
-        return null;
+function detectPlatform() {
+    const userAgent = navigator.userAgent.toLowerCase();
+    if (userAgent.includes('iphone') || userAgent.includes('ipad') || userAgent.includes('ios')) {
+        return 'ios';
+    } else if (userAgent.includes('android')) {
+        return 'android';
     }
+    return 'web';
 }
 
-// Add this helper function to calculate distance locally for debugging
+function collectDeviceInfo() {
+  return {
+    platform: detectPlatform(),
+    osVersion: navigator.platform,
+    batteryLevel: navigator.getBattery ? undefined : undefined,
+    connectionType: navigator.connection?.effectiveType || 'unknown',
+    userAgent: navigator.userAgent
+  };
+}
+
+async function getBatteryInfo() {
+  try {
+    if ('getBattery' in navigator) {
+      const battery = await navigator.getBattery();
+      return {
+        level: Math.round(battery.level * 100),
+        charging: battery.charging
+      };
+    }
+  } catch (error) {
+    return null;
+  }
+}
+
+async function analyzeBatchMovement(fromLocation, toLocation, batchNum) {
+  try {
+    const apiUrl = `https://geoguardian-pa0d.onrender.com/api/v1/location/analyze-movement`;
+    
+    const batteryInfo = await getBatteryInfo();
+    
+    const requestBody = {
+      previousLocation: fromLocation,
+      currentLocation: toLocation,
+      contextHints: {
+        transportMode: elements.transportMode.value,
+        environment: elements.environment.value
+      },
+      deviceInfo: {
+        ...collectDeviceInfo(),
+        batteryLevel: batteryInfo?.level,
+        isCharging: batteryInfo?.charging
+      },
+      requestId: `batch-${batchNum}-${Date.now()}`
+    };
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return result.data;
+
+  } catch (error) {
+    log(`Batch ${batchNum} API Error: ${error.message}`, 'error');
+    return null;
+  }
+}
+
+function displayBatchResult(batchNum, fromLocation, toLocation, analysis) {
+  if (!analysis) return;
+
+  const classification = classifyBatchResult(analysis);
+  const distance = analysis.distance || 0;
+  
+  totalDistance += distance;
+  batchStats.total++;
+  batchStats[classification.type]++;
+  updateStats();
+
+  const startTime = new Date(Date.now() - (parseInt(elements.batchInterval.value) * 1000));
+  const endTime = new Date();
+  
+  const batchElement = document.createElement('div');
+  batchElement.className = `batch ${classification.type}`;
+  
+  const statusIcon = classification.type === 'normal' ? '✅' : 
+                    classification.type === 'warning' ? '⚠️' : '❌';
+  
+  const platformInfo = analysis.platformAnalysis ? 
+    `${analysis.platformAnalysis.detectedPlatform.toUpperCase()}` : 'Unknown';
+  
+  const qualityInfo = analysis.qualityFactors ? 
+    `${analysis.qualityFactors.signalQuality} signal, ${Math.round(analysis.qualityFactors.overallReliability * 100)}% reliable` : '';
+  
+  const riskInfo = analysis.metadata?.riskLevel ? 
+    `Risk: ${analysis.metadata.riskLevel.toUpperCase()}` : '';
+
+  batchElement.innerHTML = `
+    <div class="batch-header">
+      ${statusIcon} Batch #${batchNum} [${startTime.toLocaleTimeString()} → ${endTime.toLocaleTimeString()}]
+    </div>
+    <div class="batch-details">
+      Distance: ${Math.round(distance)}m | Speed: ${analysis.impliedSpeed?.toFixed(1) || 0} km/h | Time: ${analysis.timeElapsed?.toFixed(1) || 0}s
+    </div>
+    <div class="batch-details">
+      Platform: ${platformInfo} | ${qualityInfo} | ${riskInfo}
+    </div>
+    <div class="batch-details">
+      From: ${fromLocation.latitude.toFixed(6)}, ${fromLocation.longitude.toFixed(6)} (±${Math.round(fromLocation.accuracy)}m)
+    </div>
+    <div class="batch-details">
+      To: ${toLocation.latitude.toFixed(6)}, ${toLocation.longitude.toFixed(6)} (±${Math.round(toLocation.accuracy)}m)
+    </div>
+    <div class="batch-status">
+      ${classification.reason}
+      ${analysis.platformAnalysis?.platformSpecificIssues?.length > 0 ? 
+        ` | Platform issues: ${analysis.platformAnalysis.platformSpecificIssues.join(', ')}` : ''}
+    </div>
+  `;
+  
+  elements.batchContainer.insertBefore(batchElement, elements.batchContainer.firstChild);
+  elements.batchContainer.style.display = 'block';
+}
+
 function calculateDistance(loc1, loc2) {
-    const R = 6371e3; // Earth's radius in meters
+    const R = 6371e3; 
     const φ1 = loc1.latitude * Math.PI/180;
     const φ2 = loc2.latitude * Math.PI/180;
     const Δφ = (loc2.latitude-loc1.latitude) * Math.PI/180;
@@ -185,7 +252,7 @@ function calculateDistance(loc1, loc2) {
               Math.sin(Δλ/2) * Math.sin(Δλ/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 
-    return R * c; // Distance in meters
+    return R * c;
 }
 
 function classifyBatchResult(analysis) {
@@ -214,55 +281,6 @@ function classifyBatchResult(analysis) {
     }
 
     return { type: 'normal', reason: `Normal movement: ${analysis.impliedSpeed.toFixed(1)} km/h` };
-}
-
-function displayBatchResult(batchNum, fromLocation, toLocation, analysis) {
-    const classification = classifyBatchResult(analysis);
-    const distance = analysis ? analysis.distance : 0;
-    
-    totalDistance += distance;
-    batchStats.total++;
-    batchStats[classification.type]++;
-    
-    updateStats();
-
-    const startTime = new Date(Date.now() - (parseInt(elements.batchInterval.value) * 1000));
-    const endTime = new Date();
-    
-    const batchElement = document.createElement('div');
-    batchElement.className = `batch ${classification.type}`;
-    
-    const statusIcon = classification.type === 'normal' ? '✅' : 
-                      classification.type === 'warning' ? '⚠️' : '❌';
-    
-    const speedText = analysis ? `${analysis.impliedSpeed.toFixed(1)} km/h` : 'N/A';
-    const timeText = analysis ? `${analysis.timeElapsed.toFixed(1)}s` : 'N/A';
-    
-    batchElement.innerHTML = `
-        <div class="batch-header">
-            ${statusIcon} Batch #${batchNum} [${startTime.toLocaleTimeString()} → ${endTime.toLocaleTimeString()}]
-        </div>
-        <div class="batch-details">
-            Distance: ${Math.round(distance)}m | Speed: ${speedText} | Time: ${timeText}
-        </div>
-        <div class="batch-details">
-            From: ${fromLocation.latitude.toFixed(6)}, ${fromLocation.longitude.toFixed(6)} (±${Math.round(fromLocation.accuracy)}m)
-        </div>
-        <div class="batch-details">
-            To: ${toLocation.latitude.toFixed(6)}, ${toLocation.longitude.toFixed(6)} (±${Math.round(toLocation.accuracy)}m)
-        </div>
-        <div class="batch-status">
-            ${classification.reason}
-        </div>
-    `;
-    
-    elements.batchContainer.insertBefore(batchElement, elements.batchContainer.firstChild);
-    elements.batchContainer.style.display = 'block';
-    
-    const logType = classification.type === 'anomaly' ? 'error' : 
-                   classification.type === 'warning' ? 'warning' : 'info';
-    
-    log(`Batch #${batchNum}: ${Math.round(distance)}m, ${speedText} - ${classification.reason.toUpperCase()}`, logType);
 }
 
 async function processBatchReading() {

@@ -9,7 +9,7 @@ router.post('/analyze-movement', (req, res) => {
   const startTime = Date.now();
   
   try {
-    const { previousLocation, currentLocation, maxReasonableSpeed, contextHints, requestId } = req.body as MovementAnalysisRequest;
+    const { previousLocation, currentLocation, maxReasonableSpeed, contextHints, deviceInfo, requestId } = req.body as MovementAnalysisRequest;
     
     if (!previousLocation || !currentLocation) {
       return res.status(400).json({
@@ -45,6 +45,7 @@ router.post('/analyze-movement', (req, res) => {
       currentLocation: sanitizedCurrent,
       maxReasonableSpeed,
       contextHints,
+      deviceInfo,
       requestId
     });
 
