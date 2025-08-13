@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoGuardian Batch Movement Analysis</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #2563eb;
+            margin: 0;
+            font-size: 2rem;
+        }
+        .header p {
+            color: #6b7280;
+            margin: 8px 0 0 0;
+        }
+        .button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            margin: 8px 0;
+            transition: background 0.2s;
+        }
+        .button:hover {
+            background: #1d4ed8;
+        }
+        .button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        .button.danger {
+            background: #dc2626;
+        }
+        .button.danger:hover {
+            background: #b91c1c;
+        }
+        .countdown {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: #2563eb;
+            margin: 20px 0;
+            padding: 16px;
+            background: #dbeafe;
+            border-radius: 8px;
+            display: none;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            text-align: center;
+            padding: 16px;
+            border-radius: 8px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1f2937;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+        .batch-container {
+            max-height: 400px;
+            overflow-y: auto;
+            margin: 20px 0;
+        }
+        .batch {
+            margin: 12px 0;
+            padding: 16px;
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+        .batch.normal {
+            background: #f0fdf4;
+            border-left-color: #16a34a;
+        }
+        .batch.warning {
+            background: #fffbeb;
+            border-left-color: #f59e0b;
+        }
+        .batch.anomaly {
+            background: #fef2f2;
+            border-left-color: #dc2626;
+        }
+        .batch-header {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+        .batch-details {
+            font-size: 14px;
+            color: #6b7280;
+            margin: 4px 0;
+        }
+        .batch-status {
+            font-size: 14px;
+            margin-top: 8px;
+            padding: 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        .batch.normal .batch-status {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .batch.warning .batch-status {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .batch.anomaly .batch-status {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .settings {
+            border-top: 1px solid #e5e7eb;
+            padding-top: 20px;
+            margin-top: 20px;
+        }
+        .setting-group {
+            margin: 12px 0;
+        }
+        .setting-group label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+            color: #374151;
+        }
+        .setting-group select, .setting-group input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .logs {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin: 4px 0;
+            padding: 2px 0;
+        }
+        .log-timestamp {
+            color: #9ca3af;
+        }
+        .status {
+            padding: 12px;
+            border-radius: 8px;
+            margin: 16px 0;
+            font-weight: 500;
+        }
+        .status.info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛡️ GeoGuardian</h1>
+            <p>10-Second Batch Movement Analysis</p>
+        </div>
+
+        <button class="button" id="requestPermission">📍 Request Location Permission</button>
+        <button class="button" id="startBatchTracking" disabled>🏃 Start 10-Second Batch Tracking</button>
+        <button class="button danger" id="stopBatchTracking" disabled>⏹️ Stop Tracking</button>
+
+        <div id="countdown" class="countdown">
+            Next reading in <span id="countdownValue">10</span> seconds...
+        </div>
+
+        <div id="status" class="status info" style="display: none;">
+            Ready to start batch movement analysis
+        </div>
+
+        <div class="stats" id="stats" style="display: none;">
+            <div class="stat-card">
+                <div class="stat-value" id="totalBatches">0</div>
+                <div class="stat-label">Total Batches</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="normalBatches">0</div>
+                <div class="stat-label">Normal</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="anomalyBatches">0</div>
+                <div class="stat-label">Anomalies</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalDistance">0m</div>
+                <div class="stat-label">Total Distance</div>
+            </div>
+        </div>
+
+        <div id="batchContainer" class="batch-container" style="display: none;"></div>
+
+        <div class="settings">
+            <div class="setting-group">
+                <label for="transportMode">Transport Mode:</label>
+                <select id="transportMode">
+                    <option value="walking" selected>Walking (8 km/h max)</option>
+                    <option value="running">Running (20 km/h max)</option>
+                    <option value="cycling">Cycling (40 km/h max)</option>
+                    <option value="driving">Driving (120 km/h max)</option>
+                    <option value="unknown">Unknown (50 km/h max)</option>
+                </select>
+            </div>
+            <div class="setting-group">
+                <label for="batchInterval">Batch Interval (seconds):</label>
+                <input type="number" id="batchInterval" value="10" min="5" max="30">
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h3>📝 Activity Log</h3>
+        <div id="logs" class="logs">
+            <div class="log-entry">
+                <span class="log-timestamp">[Ready]</span> GeoGuardian batch movement analysis initialized
+            </div>
+        </div>
+        <button class="button" onclick="clearLogs()" style="margin-top: 12px; background: #6b7280;">Clear Logs</button>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

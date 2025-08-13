@@ -17,7 +17,6 @@ app.use(helmet({
 app.use(cors());
 app.use(morgan('combined'));
 app.use(express.json());
-app.use(express.static('public'));
 
 app.get('/health', (req, res) => {
   res.json({
@@ -33,13 +32,10 @@ app.get('/api/v1/info', (req, res) => {
     service: 'GeoGuardian Location Filtering API',
     version: '2.0.0',
     endpoints: [
-      'GET /health - Health check',
-      'GET /api/v1/info - Service information',
       'POST /api/v1/location/test - Single location quality analysis',
       'POST /api/v1/location/analyze-movement - Movement anomaly detection',
       'GET /api/v1/location/movement-limits - Speed limits for transport modes',
       'POST /api/v1/location/batch-movement-analysis - Analyze location sequences',
-      'GET /api/v1/location/example - Request/response examples'
     ],
     features: [
       'Location quality analysis',
