@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoGuardian Batch Movement Analysis</title>
+    <title>GeoGuardian API Demo</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            max-width: 900px;
+            max-width: 1100px;
             margin: 0 auto;
             padding: 20px;
             background: #f5f5f5;
@@ -26,11 +26,27 @@
         .header h1 {
             color: #2563eb;
             margin: 0;
-            font-size: 2rem;
+            font-size: 2.5rem;
         }
         .header p {
             color: #6b7280;
             margin: 8px 0 0 0;
+            font-size: 1.1rem;
+        }
+        .api-section {
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .api-section.active {
+            border-color: #2563eb;
+            background: #f8fafc;
+        }
+        .api-section h3 {
+            margin: 0 0 16px 0;
+            color: #1f2937;
+            font-size: 1.2rem;
         }
         .button {
             background: #2563eb;
@@ -40,8 +56,7 @@
             border-radius: 8px;
             font-size: 16px;
             cursor: pointer;
-            width: 100%;
-            margin: 8px 0;
+            margin: 8px 8px 8px 0;
             transition: background 0.2s;
         }
         .button:hover {
@@ -51,22 +66,82 @@
             background: #9ca3af;
             cursor: not-allowed;
         }
+        .button.secondary {
+            background: #10b981;
+        }
+        .button.secondary:hover {
+            background: #059669;
+        }
         .button.danger {
             background: #dc2626;
         }
         .button.danger:hover {
             background: #b91c1c;
         }
-        .countdown {
-            text-align: center;
-            font-size: 18px;
-            font-weight: bold;
-            color: #2563eb;
-            margin: 20px 0;
-            padding: 16px;
-            background: #dbeafe;
+        .button.small {
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+        .status {
+            padding: 12px;
             border-radius: 8px;
+            margin: 16px 0;
+            font-weight: 500;
+        }
+        .status.info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+        .status.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+        .status.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+        .result-display {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
             display: none;
+        }
+        .quality-score {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 16px 0;
+            padding: 16px;
+            border-radius: 8px;
+        }
+        .quality-excellent { background: #d1fae5; color: #065f46; border: 2px solid #10b981; }
+        .quality-very-good { background: #e0f2fe; color: #0c4a6e; border: 2px solid #0ea5e9; }
+        .quality-good { background: #dbeafe; color: #1e40af; border: 2px solid #3b82f6; }
+        .quality-fair { background: #fef3c7; color: #92400e; border: 2px solid #f59e0b; }
+        .quality-poor { background: #fed7d7; color: #c53030; border: 2px solid #e53e3e; }
+        .quality-very-poor { background: #fee2e2; color: #991b1b; border: 2px solid #dc2626; }
+        .quality-unusable { background: #fce7f3; color: #be185d; border: 2px solid #ec4899; }
+        .score-circle {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+            background: rgba(255,255,255,0.8);
         }
         .stats {
             display: grid;
@@ -92,7 +167,7 @@
             margin-top: 4px;
         }
         .batch-container {
-            max-height: 400px;
+            max-height: 300px;
             overflow-y: auto;
             margin: 20px 0;
         }
@@ -101,61 +176,32 @@
             padding: 16px;
             border-radius: 8px;
             border-left: 4px solid;
+            font-size: 14px;
         }
-        .batch.normal {
-            background: #f0fdf4;
-            border-left-color: #16a34a;
-        }
-        .batch.warning {
-            background: #fffbeb;
-            border-left-color: #f59e0b;
-        }
-        .batch.anomaly {
-            background: #fef2f2;
-            border-left-color: #dc2626;
-        }
+        .batch.normal { background: #f0fdf4; border-left-color: #16a34a; }
+        .batch.warning { background: #fffbeb; border-left-color: #f59e0b; }
+        .batch.anomaly { background: #fef2f2; border-left-color: #dc2626; }
         .batch-header {
             font-weight: bold;
-            font-size: 16px;
+            font-size: 15px;
             margin-bottom: 8px;
         }
         .batch-details {
-            font-size: 14px;
             color: #6b7280;
             margin: 4px 0;
         }
-        .batch-status {
-            font-size: 14px;
-            margin-top: 8px;
-            padding: 8px;
-            border-radius: 4px;
-            font-weight: 500;
-        }
-        .batch.normal .batch-status {
-            background: #dcfce7;
-            color: #166534;
-        }
-        .batch.warning .batch-status {
-            background: #fef3c7;
-            color: #92400e;
-        }
-        .batch.anomaly .batch-status {
-            background: #fee2e2;
-            color: #991b1b;
-        }
         .settings {
-            border-top: 1px solid #e5e7eb;
-            padding-top: 20px;
-            margin-top: 20px;
-        }
-        .setting-group {
-            margin: 12px 0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin: 16px 0;
         }
         .setting-group label {
             display: block;
             margin-bottom: 4px;
             font-weight: 500;
             color: #374151;
+            font-size: 14px;
         }
         .setting-group select, .setting-group input {
             width: 100%;
@@ -163,6 +209,17 @@
             border: 1px solid #d1d5db;
             border-radius: 6px;
             font-size: 14px;
+        }
+        .countdown {
+            text-align: center;
+            font-size: 16px;
+            font-weight: bold;
+            color: #2563eb;
+            margin: 16px 0;
+            padding: 12px;
+            background: #dbeafe;
+            border-radius: 8px;
+            display: none;
         }
         .logs {
             max-height: 200px;
@@ -181,95 +238,161 @@
         .log-timestamp {
             color: #9ca3af;
         }
-        .status {
-            padding: 12px;
+        .tab-buttons {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 16px;
+        }
+        .tab-button {
+            background: none;
+            border: 2px solid #e5e7eb;
+            padding: 8px 16px;
             border-radius: 8px;
-            margin: 16px 0;
+            cursor: pointer;
             font-weight: 500;
+            color: #6b7280;
         }
-        .status.info {
-            background: #dbeafe;
-            color: #1e40af;
-            border: 1px solid #93c5fd;
+        .tab-button.active {
+            border-color: #2563eb;
+            color: #2563eb;
+            background: #f8fafc;
         }
-        .status.success {
-            background: #d1fae5;
-            color: #065f46;
-            border: 1px solid #6ee7b7;
+        .demo-section {
+            display: none;
         }
-        .status.error {
-            background: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #fca5a5;
+        .demo-section.active {
+            display: block;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🛡️ GeoGuardian</h1>
-            <p>10-Second Batch Movement Analysis</p>
+            <h1>🛡️ GeoGuardian API Demo</h1>
+            <p>Smart Location Intelligence & Movement Analysis</p>
         </div>
 
         <button class="button" id="requestPermission">📍 Request Location Permission</button>
-        <button class="button" id="startBatchTracking" disabled>🏃 Start 10-Second Batch Tracking</button>
-        <button class="button danger" id="stopBatchTracking" disabled>⏹️ Stop Tracking</button>
 
-        <div id="countdown" class="countdown">
-            Next reading in <span id="countdownValue">10</span> seconds...
+        <div class="tab-buttons">
+            <button class="tab-button active" onclick="showDemo('quality')">📊 Signal Quality</button>
+            <button class="tab-button" onclick="showDemo('movement')">🚀 Movement Analysis</button>
+            <button class="tab-button" onclick="showDemo('batch')">📈 Batch Tracking</button>
         </div>
 
         <div id="status" class="status info" style="display: none;">
-            Ready to start batch movement analysis
+            Ready to test location services
         </div>
 
-        <div class="stats" id="stats" style="display: none;">
-            <div class="stat-card">
-                <div class="stat-value" id="totalBatches">0</div>
-                <div class="stat-label">Total Batches</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="normalBatches">0</div>
-                <div class="stat-label">Normal</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="anomalyBatches">0</div>
-                <div class="stat-label">Anomalies</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="totalDistance">0m</div>
-                <div class="stat-label">Total Distance</div>
+        <div id="qualityDemo" class="demo-section active">
+            <div class="api-section">
+                <h3>📊 GPS Signal Quality Analysis</h3>
+                <p>Test the <code>/api/v1/location/test</code> endpoint to analyze GPS signal quality and get recommendations.</p>
+                
+                <button class="button secondary" id="testQuality" disabled>🔍 Test Signal Quality</button>
+                <button class="button" id="startQualityTracking" disabled>📡 Start Quality Monitoring</button>
+                <button class="button danger" id="stopQualityTracking" disabled>⏹️ Stop Monitoring</button>
+
+                <div id="qualityDisplay" style="display: none;"></div>
+                <div id="qualityResult" class="result-display"></div>
             </div>
         </div>
 
-        <div id="batchContainer" class="batch-container" style="display: none;"></div>
+        <div id="movementDemo" class="demo-section">
+            <div class="api-section">
+                <h3>🚀 Movement Anomaly Detection</h3>
+                <p>Test the <code>/api/v1/location/analyze-movement</code> endpoint to detect GPS anomalies and validate movement patterns.</p>
 
-        <div class="settings">
-            <div class="setting-group">
-                <label for="transportMode">Transport Mode:</label>
-                <select id="transportMode">
-                    <option value="stationary" selected>Stationary (GPS drift only)</option>
-                    <option value="walking">Walking (8 km/h max)</option>
-                    <option value="running">Running (20 km/h max)</option>
-                    <option value="cycling">Cycling (40 km/h max)</option>
-                    <option value="driving">Driving (120 km/h max)</option>
-                    <option value="unknown">Unknown (50 km/h max)</option>
-                </select>
+                <div class="settings">
+                    <div class="setting-group">
+                        <label for="movementTransportMode">Transport Mode:</label>
+                        <select id="movementTransportMode">
+                            <option value="stationary">Stationary</option>
+                            <option value="walking" selected>Walking</option>
+                            <option value="cycling">Cycling</option>
+                            <option value="driving">Driving</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label for="movementEnvironment">Environment:</label>
+                        <select id="movementEnvironment">
+                            <option value="indoor">Indoor</option>
+                            <option value="urban" selected>Urban</option>
+                            <option value="outdoor">Outdoor</option>
+                            <option value="rural">Rural</option>
+                            <option value="highway">Highway</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button class="button secondary" id="testMovement" disabled>🔍 Analyze Single Movement</button>
+                <button class="button" id="startMovementTracking" disabled>📍 Start Movement Tracking</button>
+                <button class="button danger" id="stopMovementTracking" disabled>⏹️ Stop Tracking</button>
+
+                <div id="movementDisplay" style="display: none;"></div>
+                <div id="movementResult" class="result-display"></div>
             </div>
-            <div class="setting-group">
-                <label for="environment">Environment:</label>
-                <select id="environment">
-                    <option value="indoor" selected>Indoor</option>
-                    <option value="outdoor">Outdoor</option>
-                    <option value="urban">Urban</option>
-                    <option value="rural">Rural</option>
-                    <option value="highway">Highway</option>
-                    <option value="unknown">Unknown</option>
-                </select>
-            </div>
-            <div class="setting-group">
-                <label for="batchInterval">Batch Interval (seconds):</label>
-                <input type="number" id="batchInterval" value="10" min="5" max="30">
+        </div>
+
+        <div id="batchDemo" class="demo-section">
+            <div class="api-section">
+                <h3>📈 Batch Movement Analysis</h3>
+                <p>Continuous movement analysis with 10-second intervals to demonstrate real-world GPS filtering.</p>
+
+                <div class="settings">
+                    <div class="setting-group">
+                        <label for="batchTransportMode">Transport Mode:</label>
+                        <select id="batchTransportMode">
+                            <option value="stationary" selected>Stationary</option>
+                            <option value="walking">Walking</option>
+                            <option value="cycling">Cycling</option>
+                            <option value="driving">Driving</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label for="batchEnvironment">Environment:</label>
+                        <select id="batchEnvironment">
+                            <option value="indoor" selected>Indoor</option>
+                            <option value="urban">Urban</option>
+                            <option value="outdoor">Outdoor</option>
+                            <option value="rural">Rural</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label for="batchInterval">Interval (seconds):</label>
+                        <input type="number" id="batchInterval" value="10" min="5" max="30">
+                    </div>
+                </div>
+
+                <button class="button" id="startBatchTracking" disabled>🏃 Start Batch Tracking</button>
+                <button class="button danger" id="stopBatchTracking" disabled>⏹️ Stop Tracking</button>
+
+                <div id="countdown" class="countdown">
+                    Next reading in <span id="countdownValue">10</span> seconds...
+                </div>
+
+                <div class="stats" id="batchStats" style="display: none;">
+                    <div class="stat-card">
+                        <div class="stat-value" id="totalBatches">0</div>
+                        <div class="stat-label">Total Batches</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="normalBatches">0</div>
+                        <div class="stat-label">Normal</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="anomalyBatches">0</div>
+                        <div class="stat-label">Anomalies</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="totalDistance">0m</div>
+                        <div class="stat-label">Total Distance</div>
+                    </div>
+                </div>
+
+                <div id="batchContainer" class="batch-container" style="display: none;"></div>
             </div>
         </div>
     </div>
@@ -278,10 +401,10 @@
         <h3>📝 Activity Log</h3>
         <div id="logs" class="logs">
             <div class="log-entry">
-                <span class="log-timestamp">[Ready]</span> GeoGuardian batch movement analysis initialized
+                <span class="log-timestamp">[Ready]</span> GeoGuardian API Demo initialized
             </div>
         </div>
-        <button class="button" onclick="clearLogs()" style="margin-top: 12px; background: #6b7280;">Clear Logs</button>
+        <button class="button small" onclick="clearLogs()" style="margin-top: 12px; background: #6b7280;">Clear Logs</button>
     </div>
 
     <script src="script.js"></script>
