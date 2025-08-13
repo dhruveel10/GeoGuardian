@@ -5,8 +5,8 @@ export interface MovementAnalysisRequest {
   currentLocation: LocationReading;
   maxReasonableSpeed?: number;
   contextHints?: {
-    transportMode?: 'walking' | 'cycling' | 'driving' | 'flying' | 'unknown';
-    environment?: 'urban' | 'highway' | 'indoor' | 'rural';
+    transportMode?: 'walking' | 'cycling' | 'driving' | 'flying' | 'stationary' | 'unknown';
+    environment?: 'urban' | 'highway' | 'indoor' | 'rural' | 'outdoor' | 'unknown';
   };
   requestId?: string;
 }
@@ -17,7 +17,7 @@ export interface MovementAnalysisResult {
   timeElapsed: number;
   impliedSpeed: number;
   speedUnit: 'km/h' | 'mph' | 'm/s';
-  anomalyType?: 'impossible_speed' | 'teleportation' | 'gps_jump' | 'time_inconsistency';
+  anomalyType?: 'impossible_speed' | 'teleportation' | 'gps_jump' | 'time_inconsistency' | 'gps_drift';
   confidence: number;
   reason: string;
   recommendation: string;

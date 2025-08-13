@@ -87,8 +87,8 @@ router.get('/movement-limits', (req, res) => {
         ...limits,
         unit: 'km/h'
       },
-      availableTransportModes: ['walking', 'cycling', 'driving', 'flying', 'unknown'],
-      availableEnvironments: ['urban', 'highway', 'indoor', 'rural', 'unknown']
+      availableTransportModes: ['walking', 'cycling', 'driving', 'flying', 'stationary', 'unknown'],
+      availableEnvironments: ['urban', 'highway', 'indoor', 'rural', 'outdoor', 'unknown']
     }
   });
 });

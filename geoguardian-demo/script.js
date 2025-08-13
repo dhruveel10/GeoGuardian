@@ -15,6 +15,7 @@ const elements = {
     startBatchTracking: document.getElementById('startBatchTracking'),
     stopBatchTracking: document.getElementById('stopBatchTracking'),
     transportMode: document.getElementById('transportMode'),
+    environment: document.getElementById('environment'),
     batchInterval: document.getElementById('batchInterval'),
     countdown: document.getElementById('countdown'),
     countdownValue: document.getElementById('countdownValue'),
@@ -29,11 +30,12 @@ const elements = {
 };
 
 const SPEED_LIMITS = {
-    walking: 8,     // km/h
-    running: 20,    // km/h  
-    cycling: 40,    // km/h
-    driving: 120,   // km/h
-    unknown: 50     // km/h
+    walking: 8,
+    running: 20,
+    cycling: 40,
+    driving: 120,
+    stationary: 0.5,
+    unknown: 50
 };
 
 function log(message, type = 'info') {
@@ -118,19 +120,27 @@ async function collectLocationReading() {
     });
 }
 
+// Add this debug function to your script.js to check what values are being sent
 async function analyzeBatchMovement(fromLocation, toLocation, batchNum) {
     try {
-        const apiUrl = `http://localhost:3001/api/v1/location/analyze-movement`;
+        const apiUrl = `https://geoguardian-pa0d.onrender.com/api/v1/location/analyze-movement`;
         
         const requestBody = {
             previousLocation: fromLocation,
             currentLocation: toLocation,
             contextHints: {
                 transportMode: elements.transportMode.value,
-                environment: 'unknown'
+                environment: elements.environment.value
             },
             requestId: `batch-${batchNum}-${Date.now()}`
         };
+        
+        // DEBUG: Log what we're sending to the API
+        console.log('Sending to API:', {
+            transportMode: elements.transportMode.value,
+            environment: elements.environment.value,
+            distance: Math.round(calculateDistance(fromLocation, toLocation)) + 'm'
+        });
         
         const response = await fetch(apiUrl, {
             method: 'POST',
@@ -145,6 +155,15 @@ async function analyzeBatchMovement(fromLocation, toLocation, batchNum) {
         }
 
         const result = await response.json();
+        
+        // DEBUG: Log what API returned
+        console.log('API Response:', {
+            accepted: result.data.accepted,
+            anomalyType: result.data.anomalyType,
+            reason: result.data.reason,
+            impliedSpeed: result.data.impliedSpeed
+        });
+        
         return result.data;
 
     } catch (error) {
@@ -153,19 +172,43 @@ async function analyzeBatchMovement(fromLocation, toLocation, batchNum) {
     }
 }
 
+// Add this helper function to calculate distance locally for debugging
+function calculateDistance(loc1, loc2) {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = loc1.latitude * Math.PI/180;
+    const φ2 = loc2.latitude * Math.PI/180;
+    const Δφ = (loc2.latitude-loc1.latitude) * Math.PI/180;
+    const Δλ = (loc2.longitude-loc1.longitude) * Math.PI/180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return R * c; // Distance in meters
+}
+
 function classifyBatchResult(analysis) {
     if (!analysis) {
         return { type: 'anomaly', reason: 'API analysis failed' };
     }
 
+    const transportMode = elements.transportMode.value;
+
     if (!analysis.accepted) {
-        if (analysis.anomalyType === 'teleportation' || analysis.impliedSpeed > SPEED_LIMITS[elements.transportMode.value] * 2) {
+        if (analysis.anomalyType === 'teleportation' || 
+            (analysis.anomalyType === 'gps_drift' && transportMode === 'stationary') ||
+            analysis.impliedSpeed > SPEED_LIMITS[transportMode] * 2) {
             return { type: 'anomaly', reason: analysis.reason };
         }
         return { type: 'warning', reason: analysis.reason };
     }
 
-    const maxSpeed = SPEED_LIMITS[elements.transportMode.value];
+    if (transportMode === 'stationary') {
+        return { type: 'normal', reason: analysis.reason };
+    }
+
+    const maxSpeed = SPEED_LIMITS[transportMode];
     if (analysis.impliedSpeed > maxSpeed * 0.8) {
         return { type: 'warning', reason: `High speed: ${analysis.impliedSpeed.toFixed(1)} km/h (near ${maxSpeed} km/h limit)` };
     }
@@ -298,6 +341,7 @@ elements.startBatchTracking.addEventListener('click', () => {
     elements.startBatchTracking.disabled = true;
     elements.stopBatchTracking.disabled = false;
     elements.transportMode.disabled = true;
+    elements.environment.disabled = true;
     elements.batchInterval.disabled = true;
 });
 
@@ -320,6 +364,7 @@ elements.stopBatchTracking.addEventListener('click', () => {
     elements.startBatchTracking.disabled = false;
     elements.stopBatchTracking.disabled = true;
     elements.transportMode.disabled = false;
+    elements.environment.disabled = false;
     elements.batchInterval.disabled = false;
 });
 
