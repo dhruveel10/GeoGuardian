@@ -7,6 +7,10 @@ let batchNumber = 0;
 let totalDistance = 0;
 let batchStats = { total: 0, normal: 0, warning: 0, anomaly: 0 };
 
+const API_CONFIG = {
+    BASE_URL: 'https://geoguardian-pa0d.onrender.com', 
+};
+
 const elements = {
     requestPermission: document.getElementById('requestPermission'),
     status: document.getElementById('status'),
@@ -17,14 +21,6 @@ const elements = {
     stopQualityTracking: document.getElementById('stopQualityTracking'),
     qualityDisplay: document.getElementById('qualityDisplay'),
     qualityResult: document.getElementById('qualityResult'),
-    
-    testMovement: document.getElementById('testMovement'),
-    startMovementTracking: document.getElementById('startMovementTracking'),
-    stopMovementTracking: document.getElementById('stopMovementTracking'),
-    movementTransportMode: document.getElementById('movementTransportMode'),
-    movementEnvironment: document.getElementById('movementEnvironment'),
-    movementDisplay: document.getElementById('movementDisplay'),
-    movementResult: document.getElementById('movementResult'),
     
     startBatchTracking: document.getElementById('startBatchTracking'),
     stopBatchTracking: document.getElementById('stopBatchTracking'),
@@ -136,29 +132,51 @@ async function collectLocationReading() {
     });
 }
 
+async function makeAPIRequest(endpoint, method = 'GET', data = null) {
+    const url = `${API_CONFIG.BASE_URL}${endpoint}`;
+    
+    try {
+        const options = {
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        };
+        
+        if (data) {
+            options.body = JSON.stringify(data);
+        }
+        
+        log(`Making ${method} request to: ${url}`);
+        const response = await fetch(url, options);
+        
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.status} - ${response.statusText}`);
+        }
+        
+        return await response.json();
+    } catch (error) {
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            throw new Error(`Network error: Cannot connect to ${url}. Check if the backend is running and the URL is correct.`);
+        }
+        throw error;
+    }
+}
+
 async function testSignalQuality() {
     try {
         showStatus('Testing signal quality...', 'info');
         const location = await collectLocationReading();
         
-        const response = await fetch(`${window.location.origin}/api/v1/location/test`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                location: location,
-                requestId: `quality-${Date.now()}`,
-                metadata: {
-                    batteryLevel: (await getBatteryInfo())?.level,
-                    connectionType: navigator.connection?.effectiveType
-                }
-            })
+        const result = await makeAPIRequest('/api/v1/location/test', 'POST', {
+            location: location,
+            requestId: `quality-${Date.now()}`,
+            metadata: {
+                batteryLevel: (await getBatteryInfo())?.level,
+                connectionType: navigator.connection?.effectiveType
+            }
         });
 
-        if (!response.ok) {
-            throw new Error(`API Error: ${response.status}`);
-        }
-
-        const result = await response.json();
         displayQualityResult(result);
         log(`Quality test: ${result.data.quality.score}/100 (${result.data.quality.grade})`);
         showStatus('Signal quality analysis complete', 'success');
@@ -182,29 +200,20 @@ async function testMovementAnalysis() {
         const currentLocation = await collectLocationReading();
         const batteryInfo = await getBatteryInfo();
 
-        const response = await fetch(`${window.location.origin}/api/v1/location/analyze-movement`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                previousLocation: previousLocation,
-                currentLocation: currentLocation,
-                contextHints: {
-                    transportMode: elements.movementTransportMode.value,
-                    environment: elements.movementEnvironment.value
-                },
-                deviceInfo: {
-                    ...collectDeviceInfo(),
-                    batteryLevel: batteryInfo?.level
-                },
-                requestId: `movement-${Date.now()}`
-            })
+        const result = await makeAPIRequest('/api/v1/location/analyze-movement', 'POST', {
+            previousLocation: previousLocation,
+            currentLocation: currentLocation,
+            contextHints: {
+                transportMode: elements.movementTransportMode.value,
+                environment: elements.movementEnvironment.value
+            },
+            deviceInfo: {
+                ...collectDeviceInfo(),
+                batteryLevel: batteryInfo?.level
+            },
+            requestId: `movement-${Date.now()}`
         });
 
-        if (!response.ok) {
-            throw new Error(`API Error: ${response.status}`);
-        }
-
-        const result = await response.json();
         displayMovementResult(result);
         
         const status = result.data.accepted ? 'accepted' : 'rejected';
@@ -223,29 +232,20 @@ async function analyzeBatchMovement(fromLocation, toLocation, batchNum) {
     try {
         const batteryInfo = await getBatteryInfo();
         
-        const response = await fetch(`${window.location.origin}/api/v1/location/analyze-movement`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                previousLocation: fromLocation,
-                currentLocation: toLocation,
-                contextHints: {
-                    transportMode: elements.batchTransportMode.value,
-                    environment: elements.batchEnvironment.value
-                },
-                deviceInfo: {
-                    ...collectDeviceInfo(),
-                    batteryLevel: batteryInfo?.level
-                },
-                requestId: `batch-${batchNum}-${Date.now()}`
-            })
+        const result = await makeAPIRequest('/api/v1/location/analyze-movement', 'POST', {
+            previousLocation: fromLocation,
+            currentLocation: toLocation,
+            contextHints: {
+                transportMode: elements.batchTransportMode.value,
+                environment: elements.batchEnvironment.value
+            },
+            deviceInfo: {
+                ...collectDeviceInfo(),
+                batteryLevel: batteryInfo?.level
+            },
+            requestId: `batch-${batchNum}-${Date.now()}`
         });
 
-        if (!response.ok) {
-            throw new Error(`API Error: ${response.status}`);
-        }
-
-        const result = await response.json();
         return result.data;
 
     } catch (error) {
@@ -460,6 +460,21 @@ async function processBatchReading() {
     }
 }
 
+// Test backend connectivity on page load
+async function testBackendConnection() {
+    try {
+        log('Testing backend connection...');
+        const result = await makeAPIRequest('/health');
+        if (result.status === 'OK') {
+            log(`✅ Backend connected: ${result.service} v${result.version}`);
+            showStatus('Backend connection successful! Ready to test location services.', 'success');
+        }
+    } catch (error) {
+        log(`❌ Backend connection failed: ${error.message}`, 'error');
+        showStatus(`Backend connection failed: ${error.message}. Please check your API_CONFIG.BASE_URL`, 'error');
+    }
+}
+
 elements.requestPermission.addEventListener('click', async () => {
     if (!navigator.geolocation) {
         showStatus('Geolocation is not supported by this browser', 'error');
@@ -478,8 +493,6 @@ elements.requestPermission.addEventListener('click', async () => {
         elements.requestPermission.disabled = true;
         elements.testQuality.disabled = false;
         elements.startQualityTracking.disabled = false;
-        elements.testMovement.disabled = false;
-        elements.startMovementTracking.disabled = false;
         elements.startBatchTracking.disabled = false;
     } catch (error) {
         log(`Permission error: ${error.message}`);
@@ -488,7 +501,6 @@ elements.requestPermission.addEventListener('click', async () => {
 });
 
 elements.testQuality.addEventListener('click', testSignalQuality);
-elements.testMovement.addEventListener('click', testMovementAnalysis);
 
 elements.startQualityTracking.addEventListener('click', () => {
     log('Starting quality monitoring...');
@@ -513,31 +525,6 @@ elements.stopQualityTracking.addEventListener('click', () => {
     
     elements.startQualityTracking.disabled = false;
     elements.stopQualityTracking.disabled = true;
-});
-
-elements.startMovementTracking.addEventListener('click', () => {
-    log('Starting movement tracking...');
-    showStatus('Starting continuous movement tracking...', 'info');
-    
-    movementTrackingInterval = setInterval(() => {
-        testMovementAnalysis();
-    }, 8000);
-    
-    elements.startMovementTracking.disabled = true;
-    elements.stopMovementTracking.disabled = false;
-});
-
-elements.stopMovementTracking.addEventListener('click', () => {
-    if (movementTrackingInterval) {
-        clearInterval(movementTrackingInterval);
-        movementTrackingInterval = null;
-    }
-    
-    log('Movement tracking stopped');
-    showStatus('Movement tracking stopped', 'info');
-    
-    elements.startMovementTracking.disabled = false;
-    elements.stopMovementTracking.disabled = true;
 });
 
 elements.startBatchTracking.addEventListener('click', () => {
@@ -594,5 +581,5 @@ function clearLogs() {
 
 document.addEventListener('DOMContentLoaded', () => {
     log('GeoGuardian API Demo ready');
-    showStatus('Click "Request Location Permission" to begin testing all API endpoints', 'info');
+    testBackendConnection();
 });
