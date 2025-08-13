@@ -32,6 +32,132 @@ GeoGuardian is a production-ready location filtering API that solves the GPS acc
 
 ## 🔧 API Endpoints
 
+### Health Check & API Info
+
+#### `GET /health`
+Returns service health status and basic information.
+
+**Response:**
+```json
+{
+  "status": "OK",
+  "timestamp": "2024-01-01T12:00:00.000Z",
+  "service": "GeoGuardian API",
+  "version": "2.0.0",
+  "uptime": 3600.123
+}
+```
+
+#### `GET /api/v1/info`
+Returns detailed API information and available endpoints.
+
+**Response:**
+```json
+{
+  "service": "GeoGuardian Location Filtering API",
+  "version": "2.0.0",
+  "endpoints": [
+    "POST /api/v1/location/test - Single location quality analysis",
+    "POST /api/v1/location/analyze-movement - Movement anomaly detection",
+    "GET /api/v1/location/movement-limits - Speed limits for transport modes"
+  ],
+  "features": [
+    "Location quality analysis",
+    "Movement anomaly detection",
+    "GPS jump detection", 
+    "Impossible speed validation",
+    "Platform-aware adjustments",
+    "Context-aware filtering"
+  ],
+  "documentation": "https://github.com/dhruveel10/geoguardian",
+  "status": "Production"
+}
+```
+
+### Location Quality Analysis
+
+#### `POST /api/v1/location/test`
+
+Analyzes the quality of a single GPS location reading and provides recommendations for improvement.
+
+**Request:**
+```json
+{
+  "location": {
+    "latitude": 40.7128,
+    "longitude": -74.0060,
+    "accuracy": 15,
+    "timestamp": 1693334400000,
+    "speed": 5.2,
+    "heading": 180,
+    "altitude": 10.5,
+    "altitudeAccuracy": 8,
+    "platform": "ios",
+    "source": "gps"
+  },
+  "requestId": "quality-test-001",
+  "metadata": {
+    "batteryLevel": 75,
+    "connectionType": "wifi",
+    "deviceType": "mobile"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "received": {
+      "latitude": 40.7128,
+      "longitude": -74.0060,
+      "accuracy": 15,
+      "timestamp": 1693334400000,
+      "speed": 5.2,
+      "heading": 180,
+      "altitude": 10.5,
+      "altitudeAccuracy": 8,
+      "platform": "ios",
+      "source": "gps"
+    },
+    "processed": {
+      "latitude": 40.7128,
+      "longitude": -74.0060,
+      "accuracy": 15,
+      "timestamp": 1693334400000,
+      "speed": 5.2,
+      "heading": 180,
+      "altitude": 10.5,
+      "altitudeAccuracy": 8,
+      "platform": "ios",
+      "source": "gps"
+    },
+    "quality": {
+      "score": 80,
+      "grade": "good",
+      "issues": [
+        "Fair GPS accuracy"
+      ],
+      "recommendations": [
+        "Acceptable for most location services"
+      ]
+    },
+    "processingTime": 3
+  },
+  "requestId": "quality-test-001"
+}
+```
+
+#### Quality Grades
+- **`excellent`**: 90-100 score (≤10m accuracy)
+- **`very-good`**: 80-89 score (11-15m accuracy)
+- **`good`**: 65-79 score (16-25m accuracy)
+- **`fair`**: 50-64 score (26-50m accuracy)
+- **`poor`**: 35-49 score (51-100m accuracy)
+- **`very-poor`**: 25-34 score (101-200m accuracy)
+- **`unusable`**: 0-24 score (>200m accuracy)
+
 ### Movement Analysis
 
 #### `POST /api/v1/location/analyze-movement`
@@ -205,6 +331,54 @@ Analyzes movement between two location readings to detect GPS anomalies and vali
 }
 ```
 
+### Movement Limits
+
+#### `GET /api/v1/location/movement-limits`
+
+Returns speed limits and thresholds for different transport modes and environments.
+
+**Query Parameters:**
+- `transportMode` (optional): walking, cycling, driving, flying, stationary, unknown
+- `environment` (optional): urban, highway, indoor, rural, outdoor, unknown
+
+**Request:**
+```
+GET /api/v1/location/movement-limits?transportMode=driving&environment=urban
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "transportMode": "driving",
+    "environment": "urban",
+    "speedLimits": {
+      "maxReasonableSpeed": 120,
+      "warningThreshold": 100,
+      "anomalyThreshold": 200,
+      "unit": "km/h"
+    },
+    "availableTransportModes": [
+      "walking", 
+      "cycling", 
+      "driving", 
+      "flying", 
+      "stationary", 
+      "unknown"
+    ],
+    "availableEnvironments": [
+      "urban", 
+      "highway", 
+      "indoor", 
+      "rural", 
+      "outdoor", 
+      "unknown"
+    ]
+  }
+}
+```
+
 ## 📋 Context Configuration
 
 ### Transport Modes
@@ -251,6 +425,33 @@ Analyzes movement between two location readings to detect GPS anomalies and vali
 
 ## 🛠️ Integration Examples
 
+### Basic Location Quality Check
+```javascript
+const response = await fetch('/api/v1/location/test', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    location: {
+      latitude: 40.7128,
+      longitude: -74.0060,
+      accuracy: 15,
+      timestamp: Date.now(),
+      platform: 'ios'
+    },
+    requestId: `quality-${Date.now()}`
+  })
+});
+
+const result = await response.json();
+
+if (result.data.quality.score >= 65) {
+  console.log('GPS quality is good enough for use');
+} else {
+  console.log('GPS quality issues:', result.data.quality.issues);
+  console.log('Recommendations:', result.data.quality.recommendations);
+}
+```
+
 ### Basic Movement Validation
 ```javascript
 const response = await fetch('/api/v1/location/analyze-movement', {
@@ -280,6 +481,15 @@ if (analysis.data.accepted) {
   console.log('GPS anomaly:', analysis.data.reason);
   showUserMessage(analysis.data.recommendation);
 }
+```
+
+### Get Movement Limits
+```javascript
+const response = await fetch('/api/v1/location/movement-limits?transportMode=walking&environment=urban');
+const limits = await response.json();
+
+console.log('Max reasonable speed for walking in urban areas:', 
+  limits.data.speedLimits.maxReasonableSpeed, 'km/h');
 ```
 
 ### Stationary Device Monitoring
@@ -333,26 +543,45 @@ if (validation.data.platformAnalysis.platformSpecificIssues.length > 0) {
 ```javascript
 // Validate location before allowing delivery confirmation
 async function confirmDelivery(driverLocation, deliveryAddress) {
-  const analysis = await fetch('/api/v1/location/analyze-movement', {
+  // First check location quality
+  const qualityCheck = await fetch('/api/v1/location/test', {
     method: 'POST',
     body: JSON.stringify({
-      previousLocation: driverLastLocation,
-      currentLocation: driverLocation,
-      contextHints: {
-        transportMode: 'stationary',
-        environment: 'outdoor'
-      }
+      location: driverLocation,
+      requestId: `delivery-quality-${Date.now()}`
     })
   });
 
-  const result = await analysis.json();
+  const qualityResult = await qualityCheck.json();
   
-  if (result.data.accepted && result.data.qualityFactors.overallReliability > 0.7) {
-    // Allow delivery confirmation
-    enableDeliveryButton();
-  } else {
-    // Show warning to driver
-    showMessage(result.data.recommendation);
+  if (qualityResult.data.quality.score < 50) {
+    showMessage('GPS signal too poor for delivery confirmation');
+    return;
+  }
+
+  // Then validate movement if we have previous location
+  if (driverLastLocation) {
+    const analysis = await fetch('/api/v1/location/analyze-movement', {
+      method: 'POST',
+      body: JSON.stringify({
+        previousLocation: driverLastLocation,
+        currentLocation: driverLocation,
+        contextHints: {
+          transportMode: 'stationary',
+          environment: 'outdoor'
+        }
+      })
+    });
+
+    const result = await analysis.json();
+    
+    if (result.data.accepted && result.data.qualityFactors.overallReliability > 0.7) {
+      // Allow delivery confirmation
+      enableDeliveryButton();
+    } else {
+      // Show warning to driver
+      showMessage(result.data.recommendation);
+    }
   }
 }
 ```
@@ -417,7 +646,24 @@ navigator.geolocation.getCurrentPosition(async (position) => {
     platform: 'web'
   };
 
-  // 2. Validate with previous location
+  // 2. Check location quality first
+  const qualityCheck = await fetch('/api/v1/location/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      location: newLocation,
+      requestId: `quality-${Date.now()}`
+    })
+  });
+
+  const qualityResult = await qualityCheck.json();
+  
+  if (qualityResult.data.quality.score < 50) {
+    console.warn('Poor GPS quality:', qualityResult.data.quality.issues);
+    return;
+  }
+
+  // 3. Validate movement if we have previous location
   if (previousLocation) {
     const validation = await fetch('/api/v1/location/analyze-movement', {
       method: 'POST',
@@ -434,7 +680,7 @@ navigator.geolocation.getCurrentPosition(async (position) => {
 
     const result = await validation.json();
     
-    // 3. Act on results
+    // 4. Act on results
     if (result.data.accepted) {
       updateMap(newLocation);
     } else {
@@ -445,6 +691,12 @@ navigator.geolocation.getCurrentPosition(async (position) => {
   previousLocation = newLocation;
 });
 ```
+
+## 🔗 Demo & Documentation
+
+- **Live Demo**: Available at your deployed API root URL
+- **API Documentation**: Detailed endpoint documentation and examples
+- **GitHub Repository**: [https://github.com/dhruveel10/geoguardian](https://github.com/dhruveel10/geoguardian)
 
 ---
 
