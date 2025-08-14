@@ -18,6 +18,7 @@ export interface FusionResult {
     weightDistribution?: number[];
     kalmanGain?: number;
     estimatedVelocity?: { lat: number; lon: number };
+    processingTime?: number;
   };
 }
 

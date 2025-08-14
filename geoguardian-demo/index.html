@@ -4,268 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GeoGuardian API Demo</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            max-width: 1100px;
-            margin: 0 auto;
-            padding: 20px;
-            background: #f5f5f5;
-        }
-        .container {
-            background: white;
-            border-radius: 12px;
-            padding: 24px;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .header h1 {
-            color: #2563eb;
-            margin: 0;
-            font-size: 2.5rem;
-        }
-        .header p {
-            color: #6b7280;
-            margin: 8px 0 0 0;
-            font-size: 1.1rem;
-        }
-        .api-section {
-            border: 2px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 20px 0;
-        }
-        .api-section.active {
-            border-color: #2563eb;
-            background: #f8fafc;
-        }
-        .api-section h3 {
-            margin: 0 0 16px 0;
-            color: #1f2937;
-            font-size: 1.2rem;
-        }
-        .button {
-            background: #2563eb;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            margin: 8px 8px 8px 0;
-            transition: background 0.2s;
-        }
-        .button:hover {
-            background: #1d4ed8;
-        }
-        .button:disabled {
-            background: #9ca3af;
-            cursor: not-allowed;
-        }
-        .button.secondary {
-            background: #10b981;
-        }
-        .button.secondary:hover {
-            background: #059669;
-        }
-        .button.danger {
-            background: #dc2626;
-        }
-        .button.danger:hover {
-            background: #b91c1c;
-        }
-        .button.small {
-            padding: 8px 16px;
-            font-size: 14px;
-        }
-        .status {
-            padding: 12px;
-            border-radius: 8px;
-            margin: 16px 0;
-            font-weight: 500;
-        }
-        .status.info {
-            background: #dbeafe;
-            color: #1e40af;
-            border: 1px solid #93c5fd;
-        }
-        .status.success {
-            background: #d1fae5;
-            color: #065f46;
-            border: 1px solid #6ee7b7;
-        }
-        .status.error {
-            background: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #fca5a5;
-        }
-        .result-display {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 16px;
-            margin: 16px 0;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            white-space: pre-wrap;
-            overflow-x: auto;
-            max-height: 400px;
-            overflow-y: auto;
-            display: none;
-        }
-        .quality-score {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin: 16px 0;
-            padding: 16px;
-            border-radius: 8px;
-        }
-        .quality-excellent { background: #d1fae5; color: #065f46; border: 2px solid #10b981; }
-        .quality-very-good { background: #e0f2fe; color: #0c4a6e; border: 2px solid #0ea5e9; }
-        .quality-good { background: #dbeafe; color: #1e40af; border: 2px solid #3b82f6; }
-        .quality-fair { background: #fef3c7; color: #92400e; border: 2px solid #f59e0b; }
-        .quality-poor { background: #fed7d7; color: #c53030; border: 2px solid #e53e3e; }
-        .quality-very-poor { background: #fee2e2; color: #991b1b; border: 2px solid #dc2626; }
-        .quality-unusable { background: #fce7f3; color: #be185d; border: 2px solid #ec4899; }
-        .score-circle {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 18px;
-            background: rgba(255,255,255,0.8);
-        }
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 16px;
-            margin: 20px 0;
-        }
-        .stat-card {
-            text-align: center;
-            padding: 16px;
-            border-radius: 8px;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-        }
-        .stat-value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #1f2937;
-        }
-        .stat-label {
-            font-size: 12px;
-            color: #6b7280;
-            margin-top: 4px;
-        }
-        .batch-container {
-            max-height: 300px;
-            overflow-y: auto;
-            margin: 20px 0;
-        }
-        .batch {
-            margin: 12px 0;
-            padding: 16px;
-            border-radius: 8px;
-            border-left: 4px solid;
-            font-size: 14px;
-        }
-        .batch.normal { background: #f0fdf4; border-left-color: #16a34a; }
-        .batch.warning { background: #fffbeb; border-left-color: #f59e0b; }
-        .batch.anomaly { background: #fef2f2; border-left-color: #dc2626; }
-        .batch-header {
-            font-weight: bold;
-            font-size: 15px;
-            margin-bottom: 8px;
-        }
-        .batch-details {
-            color: #6b7280;
-            margin: 4px 0;
-        }
-        .settings {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin: 16px 0;
-        }
-        .setting-group label {
-            display: block;
-            margin-bottom: 4px;
-            font-weight: 500;
-            color: #374151;
-            font-size: 14px;
-        }
-        .setting-group select, .setting-group input {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            font-size: 14px;
-        }
-        .countdown {
-            text-align: center;
-            font-size: 16px;
-            font-weight: bold;
-            color: #2563eb;
-            margin: 16px 0;
-            padding: 12px;
-            background: #dbeafe;
-            border-radius: 8px;
-            display: none;
-        }
-        .logs {
-            max-height: 200px;
-            overflow-y: auto;
-            background: #1f2937;
-            color: #f9fafb;
-            padding: 12px;
-            border-radius: 6px;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-        }
-        .log-entry {
-            margin: 4px 0;
-            padding: 2px 0;
-        }
-        .log-timestamp {
-            color: #9ca3af;
-        }
-        .tab-buttons {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #e5e7eb;
-            padding-bottom: 16px;
-        }
-        .tab-button {
-            background: none;
-            border: 2px solid #e5e7eb;
-            padding: 8px 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 500;
-            color: #6b7280;
-        }
-        .tab-button.active {
-            border-color: #2563eb;
-            color: #2563eb;
-            background: #f8fafc;
-        }
-        .demo-section {
-            display: none;
-        }
-        .demo-section.active {
-            display: block;
-        }
-    </style>
+    <link rel="stylesheet" href="./style.css">
 </head>
 <body>
     <div class="container">
@@ -277,7 +16,8 @@
         <button class="button" id="requestPermission">📍 Request Location Permission</button>
 
         <div class="tab-buttons">
-            <button class="tab-button active" onclick="showDemo('quality')">📊 Signal Quality</button>
+            <button class="tab-button active" onclick="showDemo('quality')">📊 GPS Quality</button>
+            <button class="tab-button" onclick="showDemo('fusion')">🔗 Location Fusion</button>
             <button class="tab-button" onclick="showDemo('batch')">📈 Batch Tracking</button>
         </div>
 
@@ -285,6 +25,7 @@
             Ready to test location services
         </div>
 
+        <!-- GPS Quality Demo -->
         <div id="qualityDemo" class="demo-section active">
             <div class="api-section">
                 <h3>📊 GPS Signal Quality Analysis</h3>
@@ -299,42 +40,47 @@
             </div>
         </div>
 
-        <div id="movementDemo" class="demo-section">
+        <!-- Location Fusion Demo -->
+        <div id="fusionDemo" class="demo-section">
             <div class="api-section">
-                <h3>🚀 Movement Anomaly Detection</h3>
-                <p>Test the <code>/api/v1/location/analyze-movement</code> endpoint to detect GPS anomalies and validate movement patterns.</p>
+                <h3>🔗 Location Fusion & Correction</h3>
+                <p>Test the <code>/api/v1/fusion/fused</code> and <code>/api/v1/fusion/compare</code> endpoints to improve GPS accuracy using weighted averaging and Kalman filtering.</p>
 
                 <div class="settings">
                     <div class="setting-group">
-                        <label for="movementTransportMode">Transport Mode:</label>
-                        <select id="movementTransportMode">
-                            <option value="stationary">Stationary</option>
-                            <option value="walking" selected>Walking</option>
-                            <option value="cycling">Cycling</option>
-                            <option value="driving">Driving</option>
-                        </select>
+                        <label for="fusionWeightedAveraging">
+                            <input type="checkbox" id="fusionWeightedAveraging" checked> Weighted Averaging
+                        </label>
+                        <small>Combines multiple readings with accuracy weighting</small>
                     </div>
                     <div class="setting-group">
-                        <label for="movementEnvironment">Environment:</label>
-                        <select id="movementEnvironment">
-                            <option value="indoor">Indoor</option>
-                            <option value="urban" selected>Urban</option>
-                            <option value="outdoor">Outdoor</option>
-                            <option value="rural">Rural</option>
-                            <option value="highway">Highway</option>
+                        <label for="fusionKalmanFilter">
+                            <input type="checkbox" id="fusionKalmanFilter"> Kalman Filter
+                        </label>
+                        <small>Predictive smoothing based on movement patterns</small>
+                    </div>
+                    <div class="setting-group">
+                        <label for="fusionAggressiveness">Aggressiveness:</label>
+                        <select id="fusionAggressiveness">
+                            <option value="conservative">Conservative</option>
+                            <option value="moderate" selected>Moderate</option>
+                            <option value="aggressive">Aggressive</option>
                         </select>
+                        <small>How much correction to apply</small>
                     </div>
                 </div>
 
-                <button class="button secondary" id="testMovement" disabled>🔍 Analyze Single Movement</button>
-                <button class="button" id="startMovementTracking" disabled>📍 Start Movement Tracking</button>
-                <button class="button danger" id="stopMovementTracking" disabled>⏹️ Stop Tracking</button>
+                <button class="button secondary" id="testFusion" disabled>🔍 Test Single Fusion</button>
+                <button class="button" id="testComparison" disabled>⚖️ Compare Raw vs Fused</button>
+                <button class="button" id="startFusionTracking" disabled>📡 Start Fusion Monitoring</button>
+                <button class="button danger" id="stopFusionTracking" disabled>⏹️ Stop Monitoring</button>
 
-                <div id="movementDisplay" style="display: none;"></div>
-                <div id="movementResult" class="result-display"></div>
+                <div id="fusionDisplay" style="display: none;"></div>
+                <div id="fusionResult" class="result-display"></div>
             </div>
         </div>
 
+        <!-- Batch Tracking Demo -->
         <div id="batchDemo" class="demo-section">
             <div class="api-section">
                 <h3>📈 Batch Movement Analysis</h3>

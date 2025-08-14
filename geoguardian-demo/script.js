@@ -1,14 +1,16 @@
 let previousLocation = null;
+let locationHistory = [];
 let qualityTrackingInterval = null;
 let movementTrackingInterval = null;
 let batchTrackingInterval = null;
+let fusionTrackingInterval = null;
 let countdownInterval = null;
 let batchNumber = 0;
 let totalDistance = 0;
 let batchStats = { total: 0, normal: 0, warning: 0, anomaly: 0 };
 
 const API_CONFIG = {
-    BASE_URL: 'https://geoguardian-pa0d.onrender.com', 
+    BASE_URL: 'https://geoguardian-pa0d.onrender.com',
 };
 
 const elements = {
@@ -21,6 +23,16 @@ const elements = {
     stopQualityTracking: document.getElementById('stopQualityTracking'),
     qualityDisplay: document.getElementById('qualityDisplay'),
     qualityResult: document.getElementById('qualityResult'),
+    
+    testFusion: document.getElementById('testFusion'),
+    testComparison: document.getElementById('testComparison'),
+    startFusionTracking: document.getElementById('startFusionTracking'),
+    stopFusionTracking: document.getElementById('stopFusionTracking'),
+    fusionWeightedAveraging: document.getElementById('fusionWeightedAveraging'),
+    fusionKalmanFilter: document.getElementById('fusionKalmanFilter'),
+    fusionAggressiveness: document.getElementById('fusionAggressiveness'),
+    fusionDisplay: document.getElementById('fusionDisplay'),
+    fusionResult: document.getElementById('fusionResult'),
     
     startBatchTracking: document.getElementById('startBatchTracking'),
     stopBatchTracking: document.getElementById('stopBatchTracking'),
@@ -163,6 +175,22 @@ async function makeAPIRequest(endpoint, method = 'GET', data = null) {
     }
 }
 
+function addToLocationHistory(location) {
+    locationHistory.push(location);
+    if (locationHistory.length > 5) {
+        locationHistory = locationHistory.slice(-5);
+    }
+}
+
+function getFusionOptions() {
+    return {
+        enableWeightedAveraging: elements.fusionWeightedAveraging.checked,
+        enableKalmanFilter: elements.fusionKalmanFilter.checked,
+        aggressiveness: elements.fusionAggressiveness.value,
+        maxHistoryAge: 300000
+    };
+}
+
 async function testSignalQuality() {
     try {
         showStatus('Testing signal quality...', 'info');
@@ -187,44 +215,61 @@ async function testSignalQuality() {
     }
 }
 
-async function testMovementAnalysis() {
+async function testLocationFusion() {
     try {
-        if (!previousLocation) {
-            previousLocation = await collectLocationReading();
-            showStatus('First location captured. Move and test again.', 'info');
-            log('First location captured for movement analysis');
+        showStatus('Testing location fusion...', 'info');
+        const currentLocation = await collectLocationReading();
+        addToLocationHistory(currentLocation);
+        
+        if (locationHistory.length < 2) {
+            showStatus('Need more location history. Move around and try again.', 'info');
+            log('Insufficient location history for fusion - need at least 2 readings');
             return;
         }
 
-        showStatus('Analyzing movement...', 'info');
-        const currentLocation = await collectLocationReading();
-        const batteryInfo = await getBatteryInfo();
-
-        const result = await makeAPIRequest('/api/v1/location/analyze-movement', 'POST', {
-            previousLocation: previousLocation,
+        const result = await makeAPIRequest('/api/v1/fusion/fused', 'POST', {
             currentLocation: currentLocation,
-            contextHints: {
-                transportMode: elements.movementTransportMode.value,
-                environment: elements.movementEnvironment.value
-            },
-            deviceInfo: {
-                ...collectDeviceInfo(),
-                batteryLevel: batteryInfo?.level
-            },
-            requestId: `movement-${Date.now()}`
+            locationHistory: locationHistory.slice(0, -1),
+            fusionOptions: getFusionOptions(),
+            requestId: `fusion-${Date.now()}`
         });
 
-        displayMovementResult(result);
-        
-        const status = result.data.accepted ? 'accepted' : 'rejected';
-        log(`Movement ${status}: ${result.data.distance}m, ${result.data.impliedSpeed} km/h`);
-        showStatus('Movement analysis complete', 'success');
-        
-        previousLocation = currentLocation;
+        displayFusionResult(result);
+        log(`Fusion applied: ${result.data.fusion.appliedCorrections.join(', ')}`);
+        showStatus('Location fusion complete', 'success');
 
     } catch (error) {
-        log(`Movement analysis failed: ${error.message}`, 'error');
-        showStatus(`Movement analysis failed: ${error.message}`, 'error');
+        log(`Fusion test failed: ${error.message}`, 'error');
+        showStatus(`Fusion test failed: ${error.message}`, 'error');
+    }
+}
+
+async function testFusionComparison() {
+    try {
+        showStatus('Comparing raw vs fused locations...', 'info');
+        const currentLocation = await collectLocationReading();
+        addToLocationHistory(currentLocation);
+        
+        if (locationHistory.length < 2) {
+            showStatus('Need more location history. Move around and try again.', 'info');
+            log('Insufficient location history for comparison - need at least 2 readings');
+            return;
+        }
+
+        const result = await makeAPIRequest('/api/v1/fusion/compare', 'POST', {
+            currentLocation: currentLocation,
+            locationHistory: locationHistory.slice(0, -1),
+            fusionOptions: getFusionOptions(),
+            requestId: `compare-${Date.now()}`
+        });
+
+        displayComparisonResult(result);
+        log(`Comparison: ${result.data.improvements.accuracyGain.toFixed(1)}m accuracy improvement`);
+        showStatus('Fusion comparison complete', 'success');
+
+    } catch (error) {
+        log(`Comparison failed: ${error.message}`, 'error');
+        showStatus(`Comparison failed: ${error.message}`, 'error');
     }
 }
 
@@ -287,40 +332,103 @@ function displayQualityResult(result) {
     elements.qualityResult.style.display = 'block';
 }
 
-function displayMovementResult(result) {
+function displayFusionResult(result) {
     if (!result.success || !result.data) return;
 
-    const analysis = result.data;
-    const statusIcon = analysis.accepted ? '✅' : '❌';
-    const riskColor = analysis.metadata.riskLevel === 'high' ? '#dc2626' : 
-                     analysis.metadata.riskLevel === 'medium' ? '#f59e0b' : '#16a34a';
-
-    elements.movementDisplay.innerHTML = `
-        <div style="border: 2px solid ${riskColor}; border-radius: 8px; padding: 16px; margin: 16px 0;">
-            <div style="font-size: 18px; font-weight: bold; margin-bottom: 8px;">
-                ${statusIcon} Movement Analysis Result
+    const { original, fused, fusion, comparison } = result.data;
+    
+    const accuracyImprovement = comparison.accuracyImprovement;
+    const improvementClass = accuracyImprovement > 0 ? 'improvement-positive' : 
+                           accuracyImprovement < 0 ? 'improvement-negative' : 'improvement-neutral';
+    
+    elements.fusionDisplay.innerHTML = `
+        <div class="fusion-comparison">
+            <div class="fusion-side raw">
+                <h4>📍 Raw Location</h4>
+                <div><strong>Accuracy:</strong> ±${Math.round(original.location.accuracy)}m</div>
+                <div><strong>Quality:</strong> ${original.quality.grade}</div>
+                <div><strong>Score:</strong> ${original.quality.score}/100</div>
+                <div><strong>Position:</strong> ${original.location.latitude.toFixed(6)}, ${original.location.longitude.toFixed(6)}</div>
             </div>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
-                <div>
-                    <strong>Distance:</strong> ${Math.round(analysis.distance)}m<br>
-                    <strong>Speed:</strong> ${analysis.impliedSpeed} km/h<br>
-                    <strong>Risk:</strong> ${analysis.metadata.riskLevel.toUpperCase()}
+            <div class="fusion-side fused">
+                <h4>🔗 Fused Location</h4>
+                <div><strong>Accuracy:</strong> ±${Math.round(fused.location.accuracy)}m 
+                    <span class="${improvementClass}">
+                        ${accuracyImprovement > 0 ? '↑' : accuracyImprovement < 0 ? '↓' : '→'}${Math.abs(accuracyImprovement).toFixed(1)}m
+                    </span>
                 </div>
-                <div>
-                    <strong>Platform:</strong> ${analysis.platformAnalysis.detectedPlatform}<br>
-                    <strong>Signal:</strong> ${analysis.qualityFactors.signalQuality}<br>
-                    <strong>Reliability:</strong> ${Math.round(analysis.qualityFactors.overallReliability * 100)}%
-                </div>
-            </div>
-            <div style="margin-top: 12px; padding: 8px; background: rgba(0,0,0,0.05); border-radius: 4px;">
-                <strong>Analysis:</strong> ${analysis.reason}
+                <div><strong>Quality:</strong> ${fused.quality.grade}</div>
+                <div><strong>Score:</strong> ${fused.quality.score}/100</div>
+                <div><strong>Position:</strong> ${fused.location.latitude.toFixed(6)}, ${fused.location.longitude.toFixed(6)}</div>
             </div>
         </div>
+        
+        <div class="fusion-corrections">
+            <strong>Applied Corrections:</strong>
+            <ul>
+                ${fusion.appliedCorrections.map(correction => `<li>${correction}</li>`).join('')}
+            </ul>
+        </div>
+        
+        <div class="fusion-metadata">
+            <strong>Fusion Details:</strong><br>
+            Algorithm: ${fusion.metadata.algorithmUsed}<br>
+            Locations Used: ${fusion.metadata.locationsUsed}<br>
+            Distance Shift: ${comparison.distanceShift.toFixed(1)}m<br>
+            Confidence Improvement: +${fusion.confidenceImprovement.toFixed(2)}<br>
+            Processing Time: ${comparison.processingTime}ms
+        </div>
     `;
-    elements.movementDisplay.style.display = 'block';
+    elements.fusionDisplay.style.display = 'block';
     
-    elements.movementResult.innerHTML = JSON.stringify(result, null, 2);
-    elements.movementResult.style.display = 'block';
+    elements.fusionResult.innerHTML = JSON.stringify(result, null, 2);
+    elements.fusionResult.style.display = 'block';
+}
+
+function displayComparisonResult(result) {
+    if (!result.success || !result.data) return;
+
+    const { raw, fused, improvements, visualComparison } = result.data;
+    
+    elements.fusionDisplay.innerHTML = `
+        <div class="fusion-comparison">
+            <div class="fusion-side raw">
+                <h4>📍 Raw Analysis</h4>
+                <div><strong>Accuracy:</strong> ±${Math.round(raw.location.accuracy)}m</div>
+                <div><strong>Quality Score:</strong> ${raw.quality.score}/100</div>
+                <div><strong>Grade:</strong> ${raw.quality.grade}</div>
+                <div><strong>Issues:</strong> ${raw.quality.issues.length}</div>
+                <div><strong>Recommendations:</strong> ${raw.quality.recommendations.length}</div>
+            </div>
+            <div class="fusion-side fused">
+                <h4>🔗 Fused Analysis</h4>
+                <div><strong>Accuracy:</strong> ±${Math.round(fused.location.accuracy)}m</div>
+                <div><strong>Quality Score:</strong> ${fused.quality.score}/100</div>
+                <div><strong>Grade:</strong> ${fused.quality.grade}</div>
+                <div><strong>Issues:</strong> ${fused.quality.issues.length}</div>
+                <div><strong>Recommendations:</strong> ${fused.quality.recommendations.length}</div>
+            </div>
+        </div>
+        
+        <div class="fusion-metadata">
+            <strong>Improvements:</strong><br>
+            Accuracy Gain: <span class="${improvements.accuracyGain > 0 ? 'improvement-positive' : 'improvement-neutral'}">${improvements.accuracyGain.toFixed(1)}m</span><br>
+            Quality Score Gain: <span class="${improvements.qualityScoreGain > 0 ? 'improvement-positive' : 'improvement-neutral'}">${improvements.qualityScoreGain.toFixed(1)} points</span><br>
+            Confidence Gain: <span class="${improvements.confidenceGain > 0 ? 'improvement-positive' : 'improvement-neutral'}">${improvements.confidenceGain.toFixed(2)}</span><br>
+            Recommendations Reduced: <span class="${improvements.recommendationsReduced > 0 ? 'improvement-positive' : 'improvement-neutral'}">${improvements.recommendationsReduced}</span>
+        </div>
+        
+        <div class="fusion-corrections">
+            <strong>Platform Optimizations:</strong>
+            <ul>
+                ${visualComparison.platformOptimizations.map(opt => `<li>${opt}</li>`).join('')}
+            </ul>
+        </div>
+    `;
+    elements.fusionDisplay.style.display = 'block';
+    
+    elements.fusionResult.innerHTML = JSON.stringify(result, null, 2);
+    elements.fusionResult.style.display = 'block';
 }
 
 function displayBatchResult(batchNum, fromLocation, toLocation, analysis) {
@@ -460,7 +568,6 @@ async function processBatchReading() {
     }
 }
 
-// Test backend connectivity on page load
 async function testBackendConnection() {
     try {
         log('Testing backend connection...');
@@ -475,6 +582,11 @@ async function testBackendConnection() {
     }
 }
 
+function clearLogs() {
+    elements.logs.innerHTML = '<div class="log-entry"><span class="log-timestamp">[Cleared]</span> Log cleared</div>';
+}
+
+// Event Listeners
 elements.requestPermission.addEventListener('click', async () => {
     if (!navigator.geolocation) {
         showStatus('Geolocation is not supported by this browser', 'error');
@@ -493,6 +605,9 @@ elements.requestPermission.addEventListener('click', async () => {
         elements.requestPermission.disabled = true;
         elements.testQuality.disabled = false;
         elements.startQualityTracking.disabled = false;
+        elements.testFusion.disabled = false;
+        elements.testComparison.disabled = false;
+        elements.startFusionTracking.disabled = false;
         elements.startBatchTracking.disabled = false;
     } catch (error) {
         log(`Permission error: ${error.message}`);
@@ -500,6 +615,7 @@ elements.requestPermission.addEventListener('click', async () => {
     }
 });
 
+// Quality tracking
 elements.testQuality.addEventListener('click', testSignalQuality);
 
 elements.startQualityTracking.addEventListener('click', () => {
@@ -527,6 +643,36 @@ elements.stopQualityTracking.addEventListener('click', () => {
     elements.stopQualityTracking.disabled = true;
 });
 
+// Fusion tracking
+elements.testFusion.addEventListener('click', testLocationFusion);
+elements.testComparison.addEventListener('click', testFusionComparison);
+
+elements.startFusionTracking.addEventListener('click', () => {
+    log('Starting fusion monitoring...');
+    showStatus('Starting continuous fusion monitoring...', 'info');
+    
+    fusionTrackingInterval = setInterval(() => {
+        testFusionComparison();
+    }, 8000);
+    
+    elements.startFusionTracking.disabled = true;
+    elements.stopFusionTracking.disabled = false;
+});
+
+elements.stopFusionTracking.addEventListener('click', () => {
+    if (fusionTrackingInterval) {
+        clearInterval(fusionTrackingInterval);
+        fusionTrackingInterval = null;
+    }
+    
+    log('Fusion monitoring stopped');
+    showStatus('Fusion monitoring stopped', 'info');
+    
+    elements.startFusionTracking.disabled = false;
+    elements.stopFusionTracking.disabled = true;
+});
+
+// Batch tracking
 elements.startBatchTracking.addEventListener('click', () => {
     const intervalSeconds = parseInt(elements.batchInterval.value);
     
@@ -574,10 +720,6 @@ elements.stopBatchTracking.addEventListener('click', () => {
     elements.batchEnvironment.disabled = false;
     elements.batchInterval.disabled = false;
 });
-
-function clearLogs() {
-    elements.logs.innerHTML = '<div class="log-entry"><span class="log-timestamp">[Cleared]</span> Log cleared</div>';
-}
 
 document.addEventListener('DOMContentLoaded', () => {
     log('GeoGuardian API Demo ready');

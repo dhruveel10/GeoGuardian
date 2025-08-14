@@ -4,15 +4,22 @@ import { FusionOptions, FusionResult } from '../types/locationFusion';
 export class LocationFusionEngine {
   private static readonly PLATFORM_ACCURACY_FACTORS = {
     ios: { multiplier: 0.85, bias: -2 },
-    android: { multiplier: 1.1, bias: 1 },
-    web: { multiplier: 1.3, bias: 5 },
+    android: { multiplier: 0.95, bias: 0 },
+    web: { multiplier: 0.9, bias: 0 },
     unknown: { multiplier: 1.0, bias: 0 }
   };
 
   private static readonly AGGRESSIVENESS_SETTINGS = {
-    conservative: { weightDecay: 0.7, kalmanProcessNoise: 0.1, maxCorrection: 20 },
-    moderate: { weightDecay: 0.5, kalmanProcessNoise: 0.5, maxCorrection: 50 },
-    aggressive: { weightDecay: 0.3, kalmanProcessNoise: 1.0, maxCorrection: 100 }
+    conservative: { weightDecay: 0.7, kalmanProcessNoise: 0.1, maxCorrection: 15, fusionThreshold: 0.9 },
+    moderate: { weightDecay: 0.5, kalmanProcessNoise: 0.5, maxCorrection: 30, fusionThreshold: 0.8 },
+    aggressive: { weightDecay: 0.3, kalmanProcessNoise: 1.0, maxCorrection: 50, fusionThreshold: 0.7 }
+  };
+
+  private static readonly ENVIRONMENT_ACCURACY_EXPECTATIONS = {
+    indoor: { minRealistic: 15, typical: 40 },
+    urban: { minRealistic: 8, typical: 20 },
+    outdoor: { minRealistic: 3, typical: 10 },
+    unknown: { minRealistic: 10, typical: 25 }
   };
 
   static fuseLocation(
@@ -22,50 +29,153 @@ export class LocationFusionEngine {
   ): FusionResult {
     const startTime = Date.now();
     const appliedCorrections: string[] = [];
-    let fusedLocation = { ...currentLocation };
-    let confidenceImprovement = 0;
     const metadata: FusionResult['fusionMetadata'] = {
-      algorithmUsed: 'none',
+      algorithmUsed: 'smart_conditional',
       locationsUsed: 1
     };
 
+    const settings = this.AGGRESSIVENESS_SETTINGS[options.aggressiveness || 'moderate'];
     const validHistory = this.filterValidHistory(locationHistory, currentLocation, options.maxHistoryAge || 300000);
-    const allLocations = [...validHistory, currentLocation];
+    
+    const shouldAttemptFusion = this.shouldAttemptFusion(currentLocation, validHistory, settings);
+    if (!shouldAttemptFusion.should) {
+      appliedCorrections.push(shouldAttemptFusion.reason);
+      return {
+        originalLocation: currentLocation,
+        fusedLocation: currentLocation,
+        appliedCorrections,
+        confidenceImprovement: 0,
+        fusionMetadata: { ...metadata, algorithmUsed: 'smart_bailout' }
+      };
+    }
+
+    let bestLocation = { ...currentLocation };
+    let bestConfidence = this.calculateLocationConfidence(currentLocation);
+    let confidenceImprovement = 0;
 
     if (options.enableWeightedAveraging && validHistory.length > 0) {
-      const weightedResult = this.applyWeightedAveraging(allLocations, options.aggressiveness || 'moderate');
-      fusedLocation = weightedResult.location;
-      appliedCorrections.push(`Weighted averaging (${validHistory.length + 1} locations)`);
-      confidenceImprovement += weightedResult.confidenceGain;
-      metadata.algorithmUsed = 'weighted_averaging';
-      metadata.locationsUsed = allLocations.length;
-      metadata.weightDistribution = weightedResult.weights;
+      const weightedResult = this.applySmartWeightedAveraging(
+        [...validHistory, currentLocation], 
+        options.aggressiveness || 'moderate'
+      );
+      
+      const fusedConfidence = this.calculateLocationConfidence(weightedResult.location);
+      if (fusedConfidence > bestConfidence * settings.fusionThreshold) {
+        bestLocation = weightedResult.location;
+        bestConfidence = fusedConfidence;
+        appliedCorrections.push(`Smart weighted averaging (${validHistory.length + 1} locations)`);
+        confidenceImprovement += weightedResult.confidenceGain;
+        metadata.algorithmUsed = 'smart_weighted_averaging';
+        metadata.locationsUsed = validHistory.length + 1;
+        metadata.weightDistribution = weightedResult.weights;
+      } else {
+        appliedCorrections.push(`Weighted averaging rejected (confidence too low)`);
+      }
     }
 
-    if (options.enableKalmanFilter && validHistory.length > 0) {
-      const kalmanResult = this.applyKalmanFilter(fusedLocation, validHistory, options.aggressiveness || 'moderate');
-      fusedLocation = kalmanResult.location;
-      appliedCorrections.push(`Kalman filter smoothing`);
-      confidenceImprovement += kalmanResult.confidenceGain;
-      metadata.algorithmUsed = options.enableWeightedAveraging ? 'weighted_averaging_kalman' : 'kalman_filter';
-      metadata.kalmanGain = kalmanResult.gain;
-      metadata.estimatedVelocity = kalmanResult.velocity;
+    if (options.enableKalmanFilter && validHistory.length > 1) {
+      const kalmanResult = this.applyAdaptiveKalmanFilter(
+        bestLocation, 
+        validHistory, 
+        options.aggressiveness || 'moderate'
+      );
+      
+      const kalmanConfidence = this.calculateLocationConfidence(kalmanResult.location);
+      if (kalmanConfidence > bestConfidence * settings.fusionThreshold) {
+        bestLocation = kalmanResult.location;
+        bestConfidence = kalmanConfidence;
+        appliedCorrections.push(`Adaptive Kalman filter`);
+        confidenceImprovement += kalmanResult.confidenceGain;
+        metadata.algorithmUsed = metadata.algorithmUsed.includes('weighted') ? 
+          'smart_weighted_adaptive_kalman' : 'adaptive_kalman';
+        metadata.kalmanGain = kalmanResult.gain;
+        metadata.estimatedVelocity = kalmanResult.velocity;
+      } else {
+        appliedCorrections.push(`Kalman filter rejected (confidence too low)`);
+      }
     }
 
-    fusedLocation = this.applyPlatformCorrections(fusedLocation, appliedCorrections);
+    const originalConfidence = this.calculateLocationConfidence(currentLocation);
+    const finalConfidence = this.calculateLocationConfidence(bestLocation);
+    
+    if (finalConfidence < originalConfidence * 0.95) {
+      appliedCorrections.length = 0;
+      appliedCorrections.push('All fusion rejected - would decrease confidence');
+      bestLocation = currentLocation;
+      metadata.algorithmUsed = 'confidence_fallback';
+    }
 
     const processingTime = Date.now() - startTime;
-    if (processingTime > 10) {
-      metadata.algorithmUsed += '_optimized';
-    }
-
+    
     return {
       originalLocation: currentLocation,
-      fusedLocation,
+      fusedLocation: bestLocation,
       appliedCorrections,
       confidenceImprovement: Math.round(confidenceImprovement * 100) / 100,
       fusionMetadata: metadata
     };
+  }
+
+  private static shouldAttemptFusion(
+    current: LocationReading, 
+    history: LocationReading[], 
+    settings: any
+  ): { should: boolean; reason: string } {
+    
+    if (history.length === 0) {
+      return { should: false, reason: 'No location history available' };
+    }
+
+    if (current.accuracy <= 8) {
+      return { should: false, reason: 'Current accuracy excellent (≤8m) - fusion unnecessary' };
+    }
+
+    if (history.length > 0) {
+      const lastLocation = history[history.length - 1];
+      const timeDiff = (current.timestamp - lastLocation.timestamp) / 1000;
+      const distance = this.calculateDistance(
+        current.latitude, current.longitude,
+        lastLocation.latitude, lastLocation.longitude
+      );
+      const speed = timeDiff > 0 ? (distance / timeDiff) * 3.6 : 0;
+      
+      if (speed > 50) {
+        return { should: false, reason: `High speed detected (${speed.toFixed(1)} km/h) - fusion too risky` };
+      }
+    }
+
+    const goodHistoryCount = history.filter(loc => loc.accuracy <= current.accuracy * 1.2).length;
+    if (goodHistoryCount < 1) {
+      return { should: false, reason: 'Insufficient quality history for reliable fusion' };
+    }
+
+    return { should: true, reason: 'Fusion conditions favorable' };
+  }
+
+  private static calculateLocationConfidence(location: LocationReading): number {
+    const platform = location.platform || 'unknown';
+    const accuracy = location.accuracy;
+    
+    let confidence = 1 / (1 + accuracy / 10);
+    
+    const platformMultipliers = {
+      ios: 1.1,
+      android: 1.0,
+      web: 0.8,
+      unknown: 0.9
+    };
+    
+    confidence *= platformMultipliers[platform] || 0.9;
+    
+    if (platform === 'web' && accuracy < 15) {
+      confidence *= 0.7;
+    }
+    
+    if (platform === 'android' && accuracy < 5) {
+      confidence *= 0.8;
+    }
+    
+    return Math.max(0.1, Math.min(1.0, confidence));
   }
 
   private static filterValidHistory(
@@ -83,11 +193,10 @@ export class LocationFusionEngine {
       .slice(-4);
   }
 
-  private static applyWeightedAveraging(
+  private static applySmartWeightedAveraging(
     locations: LocationReading[],
     aggressiveness: FusionOptions['aggressiveness']
   ): { location: LocationReading; weights: number[]; confidenceGain: number } {
-    const settings = this.AGGRESSIVENESS_SETTINGS[aggressiveness || 'moderate'];
     const currentLocation = locations[locations.length - 1];
     
     if (locations.length === 1) {
@@ -98,67 +207,86 @@ export class LocationFusionEngine {
       };
     }
 
-    const weights = this.calculateWeights(locations, settings.weightDecay);
+    const realisticLocations = locations.map(loc => this.adjustOptimisticAccuracy(loc));
+    const weights = this.calculateSmartWeights(realisticLocations, aggressiveness);
     let totalWeight = 0;
     let weightedLat = 0;
     let weightedLon = 0;
-    let weightedAccuracy = 0;
+    let weightedPrecision = 0;
 
-    locations.forEach((loc, index) => {
+    realisticLocations.forEach((loc, index) => {
       const weight = weights[index];
+      const precision = 1 / (loc.accuracy * loc.accuracy);
+      
       totalWeight += weight;
       weightedLat += loc.latitude * weight;
       weightedLon += loc.longitude * weight;
-      weightedAccuracy += loc.accuracy * weight;
+      weightedPrecision += precision * weight;
     });
 
-    const avgAccuracy = locations.reduce((sum, loc) => sum + loc.accuracy, 0) / locations.length;
-    const fusedAccuracy = Math.min(weightedAccuracy / totalWeight, avgAccuracy * 0.8);
+    const fusedAccuracy = Math.sqrt(totalWeight / weightedPrecision);
+    const bestIndividualAccuracy = Math.min(...realisticLocations.map(l => l.accuracy));
+    const conservativeAccuracy = Math.max(fusedAccuracy, bestIndividualAccuracy * 0.8);
     
-    const confidenceGain = Math.max(0, (currentLocation.accuracy - fusedAccuracy) / currentLocation.accuracy * 0.3);
+    const originalConfidence = this.calculateLocationConfidence(currentLocation);
+    const fusedLocationTemp = {
+      ...currentLocation,
+      latitude: weightedLat / totalWeight,
+      longitude: weightedLon / totalWeight,
+      accuracy: conservativeAccuracy
+    };
+    const fusedConfidence = this.calculateLocationConfidence(fusedLocationTemp);
+    
+    const confidenceGain = Math.max(0, fusedConfidence - originalConfidence);
 
     return {
-      location: {
-        ...currentLocation,
-        latitude: weightedLat / totalWeight,
-        longitude: weightedLon / totalWeight,
-        accuracy: fusedAccuracy
-      },
+      location: fusedLocationTemp,
       weights: weights.map(w => Math.round(w / totalWeight * 100) / 100),
       confidenceGain
     };
   }
 
-  private static calculateWeights(locations: LocationReading[], decay: number): number[] {
+  private static adjustOptimisticAccuracy(location: LocationReading): LocationReading {
+    const platform = location.platform || 'unknown';
+    let adjustedAccuracy = location.accuracy;
+    
+    if (platform === 'web') {
+      adjustedAccuracy = Math.max(adjustedAccuracy, 15);
+    }
+    
+    if (platform === 'android' && adjustedAccuracy < 8) {
+      adjustedAccuracy = Math.max(adjustedAccuracy, 8);
+    }
+    
+    const age = (Date.now() - location.timestamp) / 1000;
+    if (age > 30) {
+      adjustedAccuracy *= (1 + age / 60);
+    }
+    
+    return { ...location, accuracy: adjustedAccuracy };
+  }
+
+  private static calculateSmartWeights(locations: LocationReading[], aggressiveness: FusionOptions['aggressiveness']): number[] {
+    const settings = this.AGGRESSIVENESS_SETTINGS[aggressiveness || 'moderate'];
     const currentTime = locations[locations.length - 1].timestamp;
     
     return locations.map((loc, index) => {
       const age = (currentTime - loc.timestamp) / 1000;
-      const ageWeight = Math.exp(-age * decay / 60);
-      const accuracyWeight = 1 / (1 + loc.accuracy / 10);
-      const platformWeight = this.getPlatformWeight(loc.platform);
-      const positionWeight = index === locations.length - 1 ? 1.5 : 1.0;
+      const confidence = this.calculateLocationConfidence(loc);
       
-      return ageWeight * accuracyWeight * platformWeight * positionWeight;
+      const ageWeight = Math.exp(-age * settings.weightDecay / 60);
+      const recencyBonus = index === locations.length - 1 ? 2.0 : 1.0;
+      const confidenceWeight = Math.pow(confidence, 2);
+      
+      return ageWeight * confidenceWeight * recencyBonus;
     });
   }
 
-  private static getPlatformWeight(platform?: string): number {
-    switch (platform) {
-      case 'ios': return 1.1;
-      case 'android': return 1.0;
-      case 'web': return 0.8;
-      default: return 0.9;
-    }
-  }
-
-  private static applyKalmanFilter(
+  private static applyAdaptiveKalmanFilter(
     location: LocationReading,
     history: LocationReading[],
     aggressiveness: FusionOptions['aggressiveness']
   ): { location: LocationReading; gain: number; velocity: { lat: number; lon: number }; confidenceGain: number } {
-    const settings = this.AGGRESSIVENESS_SETTINGS[aggressiveness || 'moderate'];
-    const processNoise = settings.kalmanProcessNoise;
     
     if (history.length < 2) {
       return {
@@ -179,42 +307,40 @@ export class LocationFusionEngine {
       lon: (curr.longitude - prev.longitude) / ((curr.timestamp - prev.timestamp) / 1000)
     };
 
+    const currentConfidence = this.calculateLocationConfidence(location);
+    const historyConfidence = this.calculateLocationConfidence(curr);
+    const speedLat = velocity.lat * 111000;
+    const speedLon = velocity.lon * 111000;
+    const avgSpeed = Math.sqrt(speedLat * speedLat + speedLon * speedLon);
+    
+    let adaptiveGain = currentConfidence / (currentConfidence + historyConfidence);
+    if (avgSpeed > 5) {
+      adaptiveGain = Math.min(0.8, adaptiveGain * 1.5);
+    }
+    
     const predictedLat = curr.latitude + velocity.lat * dt;
     const predictedLon = curr.longitude + velocity.lon * dt;
     
-    const measurementNoise = location.accuracy / 111000;
-    const kalmanGain = processNoise / (processNoise + measurementNoise);
+    const correctedLat = predictedLat + adaptiveGain * (location.latitude - predictedLat);
+    const correctedLon = predictedLon + adaptiveGain * (location.longitude - predictedLon);
     
-    const correctedLat = predictedLat + kalmanGain * (location.latitude - predictedLat);
-    const correctedLon = predictedLon + kalmanGain * (location.longitude - predictedLon);
+    const improvementFactor = Math.min(0.9, currentConfidence);
+    const improvedAccuracy = location.accuracy * (1 - improvementFactor * 0.2);
     
-    const correction = this.calculateDistance(
-      location.latitude, location.longitude,
-      correctedLat, correctedLon
-    );
+    const originalConfidence = this.calculateLocationConfidence(location);
+    const fusedLocation = {
+      ...location,
+      latitude: correctedLat,
+      longitude: correctedLon,
+      accuracy: improvedAccuracy
+    };
+    const fusedConfidence = this.calculateLocationConfidence(fusedLocation);
     
-    const maxCorrection = settings.maxCorrection;
-    let finalLat = correctedLat;
-    let finalLon = correctedLon;
-    
-    if (correction > maxCorrection) {
-      const ratio = maxCorrection / correction;
-      finalLat = location.latitude + (correctedLat - location.latitude) * ratio;
-      finalLon = location.longitude + (correctedLon - location.longitude) * ratio;
-    }
-
-    const confidenceGain = Math.min(0.2, correction / location.accuracy * 0.1);
-
     return {
-      location: {
-        ...location,
-        latitude: finalLat,
-        longitude: finalLon,
-        accuracy: Math.max(location.accuracy * 0.7, location.accuracy - correction)
-      },
-      gain: Math.round(kalmanGain * 100) / 100,
+      location: fusedLocation,
+      gain: Math.round(adaptiveGain * 100) / 100,
       velocity,
-      confidenceGain
+      confidenceGain: Math.max(0, fusedConfidence - originalConfidence)
     };
   }
 
@@ -225,12 +351,15 @@ export class LocationFusionEngine {
     const platform = location.platform || 'unknown';
     const correction = this.PLATFORM_ACCURACY_FACTORS[platform];
     
-    if (correction && (correction.multiplier !== 1.0 || correction.bias !== 0)) {
-      appliedCorrections.push(`Platform correction (${platform})`);
-      return {
-        ...location,
-        accuracy: Math.max(1, location.accuracy * correction.multiplier + correction.bias)
-      };
+    if (correction && correction.multiplier !== 1.0 && location.accuracy > 10) {
+      const correctedAccuracy = Math.max(3, location.accuracy * correction.multiplier + correction.bias);
+      
+      if (correctedAccuracy < location.accuracy) {
+        return {
+          ...location,
+          accuracy: correctedAccuracy
+        };
+      }
     }
     
     return location;
