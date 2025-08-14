@@ -54,22 +54,30 @@ export class LocationFusionEngine {
     let confidenceImprovement = 0;
 
     if (options.enableWeightedAveraging && validHistory.length > 0) {
-      const weightedResult = this.applySmartWeightedAveraging(
-        [...validHistory, currentLocation], 
-        options.aggressiveness || 'moderate'
-      );
+      // Skip weighted averaging for web platform unless accuracy is very poor
+      const platform = currentLocation.platform || 'unknown';
+      const skipWeightedForWeb = platform === 'web' && currentLocation.accuracy < 100;
       
-      const fusedConfidence = this.calculateLocationConfidence(weightedResult.location);
-      if (fusedConfidence > bestConfidence * settings.fusionThreshold) {
-        bestLocation = weightedResult.location;
-        bestConfidence = fusedConfidence;
-        appliedCorrections.push(`Smart weighted averaging (${validHistory.length + 1} locations)`);
-        confidenceImprovement += weightedResult.confidenceGain;
-        metadata.algorithmUsed = 'smart_weighted_averaging';
-        metadata.locationsUsed = validHistory.length + 1;
-        metadata.weightDistribution = weightedResult.weights;
+      if (!skipWeightedForWeb) {
+        const weightedResult = this.applySmartWeightedAveraging(
+          [...validHistory, currentLocation], 
+          options.aggressiveness || 'moderate'
+        );
+        
+        const fusedConfidence = this.calculateLocationConfidence(weightedResult.location);
+        if (fusedConfidence > bestConfidence * settings.fusionThreshold) {
+          bestLocation = weightedResult.location;
+          bestConfidence = fusedConfidence;
+          appliedCorrections.push(`Smart weighted averaging (${validHistory.length + 1} locations)`);
+          confidenceImprovement += weightedResult.confidenceGain;
+          metadata.algorithmUsed = 'smart_weighted_averaging';
+          metadata.locationsUsed = validHistory.length + 1;
+          metadata.weightDistribution = weightedResult.weights;
+        } else {
+          appliedCorrections.push(`Weighted averaging rejected (confidence too low)`);
+        }
       } else {
-        appliedCorrections.push(`Weighted averaging rejected (confidence too low)`);
+        appliedCorrections.push(`Weighted averaging skipped (web platform with moderate accuracy)`);
       }
     }
 
@@ -208,42 +216,120 @@ export class LocationFusionEngine {
     }
 
     const realisticLocations = locations.map(loc => this.adjustOptimisticAccuracy(loc));
-    const weights = this.calculateSmartWeights(realisticLocations, aggressiveness);
+    
+    // Ultra-conservative: Only average if locations are very close together
+    const maxDistance = Math.min(currentLocation.accuracy * 0.5, 20);
+    const validForAveraging = realisticLocations.filter((loc, index) => {
+      if (index === realisticLocations.length - 1) return true; // Always include current
+      const distance = this.calculateDistance(
+        currentLocation.latitude, currentLocation.longitude,
+        loc.latitude, loc.longitude
+      );
+      return distance <= maxDistance;
+    });
+
+    // If historical points are too far away, don't average
+    if (validForAveraging.length < 2) {
+      return {
+        location: currentLocation,
+        weights: [1.0],
+        confidenceGain: 0
+      };
+    }
+
+    // Check for movement consistency - if erratic movement, skip averaging
+    if (validForAveraging.length > 2) {
+      const movements = [];
+      for (let i = 1; i < validForAveraging.length; i++) {
+        const prev = validForAveraging[i-1];
+        const curr = validForAveraging[i];
+        const dist = this.calculateDistance(prev.latitude, prev.longitude, curr.latitude, curr.longitude);
+        movements.push(dist);
+      }
+      const maxMovement = Math.max(...movements);
+      const avgMovement = movements.reduce((sum, m) => sum + m, 0) / movements.length;
+      
+      // If movement is too erratic, skip averaging
+      if (maxMovement > avgMovement * 3) {
+        return {
+          location: currentLocation,
+          weights: [1.0],
+          confidenceGain: 0
+        };
+      }
+    }
+
+    // Conservative weighted averaging with heavy bias toward current reading
+    const weights = this.calculateConservativeWeights(validForAveraging);
     let totalWeight = 0;
     let weightedLat = 0;
     let weightedLon = 0;
-    let weightedPrecision = 0;
 
-    realisticLocations.forEach((loc, index) => {
+    validForAveraging.forEach((loc, index) => {
       const weight = weights[index];
-      const precision = 1 / (loc.accuracy * loc.accuracy);
-      
       totalWeight += weight;
       weightedLat += loc.latitude * weight;
       weightedLon += loc.longitude * weight;
-      weightedPrecision += precision * weight;
     });
 
-    const fusedAccuracy = Math.sqrt(totalWeight / weightedPrecision);
-    const bestIndividualAccuracy = Math.min(...realisticLocations.map(l => l.accuracy));
-    const conservativeAccuracy = Math.max(fusedAccuracy, bestIndividualAccuracy * 0.8);
+    // Only apply minor correction - never move more than 30% toward average
+    const avgLat = weightedLat / totalWeight;
+    const avgLon = weightedLon / totalWeight;
     
-    const originalConfidence = this.calculateLocationConfidence(currentLocation);
-    const fusedLocationTemp = {
+    const correctionFactor = 0.3; // Maximum 30% correction
+    const correctedLat = currentLocation.latitude + (avgLat - currentLocation.latitude) * correctionFactor;
+    const correctedLon = currentLocation.longitude + (avgLon - currentLocation.longitude) * correctionFactor;
+    
+    // Conservative accuracy improvement - never claim more than 10% improvement
+    const accuracyImprovement = Math.min(currentLocation.accuracy * 0.1, 5);
+    const conservativeAccuracy = currentLocation.accuracy - accuracyImprovement;
+    
+    const fusedLocation = {
       ...currentLocation,
-      latitude: weightedLat / totalWeight,
-      longitude: weightedLon / totalWeight,
+      latitude: correctedLat,
+      longitude: correctedLon,
       accuracy: conservativeAccuracy
     };
-    const fusedConfidence = this.calculateLocationConfidence(fusedLocationTemp);
+
+    // Validate that the correction actually helps
+    const correctionDistance = this.calculateDistance(
+      currentLocation.latitude, currentLocation.longitude,
+      correctedLat, correctedLon
+    );
     
-    const confidenceGain = Math.max(0, fusedConfidence - originalConfidence);
+    // If correction moves us too far, abort
+    if (correctionDistance > currentLocation.accuracy * 0.2) {
+      return {
+        location: currentLocation,
+        weights: [1.0],
+        confidenceGain: 0
+      };
+    }
 
     return {
-      location: fusedLocationTemp,
+      location: fusedLocation,
       weights: weights.map(w => Math.round(w / totalWeight * 100) / 100),
-      confidenceGain
+      confidenceGain: accuracyImprovement / currentLocation.accuracy * 0.1
     };
+  }
+
+  private static calculateConservativeWeights(locations: LocationReading[]): number[] {
+    const currentIndex = locations.length - 1;
+    
+    return locations.map((loc, index) => {
+      if (index === currentIndex) {
+        return 5.0; // Heavy bias toward current reading
+      }
+      
+      const age = (locations[currentIndex].timestamp - loc.timestamp) / 1000;
+      const confidence = this.calculateLocationConfidence(loc);
+      
+      // Much lower weight for historical points
+      const ageWeight = Math.exp(-age / 30); // Faster decay
+      const baseWeight = confidence * ageWeight * 0.3; // Much lower base weight
+      
+      return baseWeight;
+    });
   }
 
   private static adjustOptimisticAccuracy(location: LocationReading): LocationReading {
