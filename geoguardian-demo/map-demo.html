@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoGuardian Geofence Simulation Demo</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2563eb, #3b82f6);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+
+        .header p {
+            margin: 10px 0 0 0;
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .demo-grid {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            height: calc(100vh - 200px);
+            min-height: 600px;
+        }
+
+        .map-container {
+            position: relative;
+            background: #f8fafc;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+
+        .control-panel {
+            background: #f8fafc;
+            padding: 30px;
+            overflow-y: auto;
+            border-left: 1px solid #e2e8f0;
+        }
+
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .section h3 {
+            margin: 0 0 15px 0;
+            color: #1f2937;
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            width: 100%;
+            margin: 8px 0;
+            transition: all 0.2s;
+        }
+
+        .button:hover {
+            background: #1d4ed8;
+            transform: translateY(-1px);
+        }
+
+        .button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .button.success {
+            background: #10b981;
+        }
+
+        .button.success:hover {
+            background: #059669;
+        }
+
+        .button.danger {
+            background: #dc2626;
+        }
+
+        .button.danger:hover {
+            background: #b91c1c;
+        }
+
+        .status-indicator {
+            padding: 12px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .status-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+
+        .status-warning {
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fbbf24;
+        }
+
+        .status-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        .status-info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+
+        .simulation-progress {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #06b6d4);
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .scenario-list {
+            margin: 15px 0;
+        }
+
+        .scenario-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            margin: 5px 0;
+            border-radius: 6px;
+            font-size: 13px;
+            border-left: 4px solid #e5e7eb;
+        }
+
+        .scenario-pending {
+            background: #f9fafb;
+            color: #6b7280;
+        }
+
+        .scenario-active {
+            background: #dbeafe;
+            color: #1e40af;
+            border-left-color: #3b82f6;
+        }
+
+        .scenario-complete {
+            background: #d1fae5;
+            color: #065f46;
+            border-left-color: #10b981;
+        }
+
+        .geofence-status {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin: 5px 5px 5px 0;
+        }
+
+        .badge-outside {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .badge-uncertain {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-approaching {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .badge-inside {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-leaving {
+            background: #fce7f3;
+            color: #be185d;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .metric-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #1f2937;
+        }
+
+        .metric-label {
+            font-size: 11px;
+            color: #6b7280;
+            margin-top: 2px;
+        }
+
+        .logs {
+            background: #1f2937;
+            color: #f9fafb;
+            border-radius: 6px;
+            padding: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            margin-top: 15px;
+        }
+
+        .log-entry {
+            margin: 2px 0;
+            opacity: 0.8;
+        }
+
+        .log-timestamp {
+            color: #9ca3af;
+        }
+
+        .log-success {
+            color: #10b981;
+        }
+
+        .log-warning {
+            color: #f59e0b;
+        }
+
+        .log-error {
+            color: #ef4444;
+        }
+
+        .form-group {
+            margin: 15px 0;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #374151;
+            font-size: 14px;
+        }
+
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .map-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            max-width: 280px;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            font-size: 12px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            margin-right: 8px;
+            border: 2px solid rgba(0,0,0,0.2);
+        }
+
+        @media (max-width: 1200px) {
+            .demo-grid {
+                grid-template-columns: 1fr;
+                grid-template-rows: 60vh auto;
+            }
+            
+            .control-panel {
+                border-left: none;
+                border-top: 1px solid #e2e8f0;
+                max-height: 40vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Smart Geofence Journey Simulation</h1>
+            <p>Watch how GPS points transition through geofence zones with intelligent processing</p>
+        </div>
+
+        <div class="demo-grid">
+            <div class="map-container">
+                <div class="map-overlay">
+                    <h4 style="margin: 0 0 10px 0;">📍 Current Status</h4>
+                    <div id="currentStatus" class="status-indicator status-info">
+                        Ready to start simulation
+                    </div>
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-value" id="currentDistance">--</div>
+                            <div class="metric-label">Distance (m)</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="currentConfidence">--</div>
+                            <div class="metric-label">Confidence</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="stepNumber">0</div>
+                            <div class="metric-label">Step</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="processingTime">--</div>
+                            <div class="metric-label">Process (ms)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="legend">
+                    <h4 style="margin: 0 0 8px 0; font-size: 14px;">Journey Legend</h4>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #dc2626;"></div>
+                        <span>❌ Outside</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #f59e0b;"></div>
+                        <span>❓ Uncertain</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #3b82f6;"></div>
+                        <span>🔄 Approaching</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #10b981;"></div>
+                        <span>✅ Inside</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #ec4899;"></div>
+                        <span>↗️ Leaving</span>
+                    </div>
+                </div>
+
+                <div id="map"></div>
+            </div>
+
+            <div class="control-panel">
+                <div class="section">
+                    <h3>🎮 Simulation Controls</h3>
+                    <div class="form-group">
+                        <label for="simulationSpeed">Speed:</label>
+                        <select id="simulationSpeed">
+                            <option value="2000">Slow (2s per step)</option>
+                            <option value="1000" selected>Normal (1s per step)</option>
+                            <option value="500">Fast (0.5s per step)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="platformType">Platform:</label>
+                        <select id="platformType">
+                            <option value="ios">iOS Device</option>
+                            <option value="android" selected>Android Device</option>
+                            <option value="web">Web Browser</option>
+                        </select>
+                    </div>
+                    <button class="button success" id="startSimulation">▶️ Start Journey</button>
+                    <button class="button danger" id="stopSimulation" disabled>⏹️ Stop Simulation</button>
+                    <button class="button" id="resetSimulation">🔄 Reset</button>
+                </div>
+
+                <div class="section">
+                    <h3>📊 Journey Progress</h3>
+                    <div class="simulation-progress">
+                        <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px;">
+                            <span>Progress</span>
+                            <span id="progressText">0 / 15 steps</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3>🗺️ Journey Scenarios</h3>
+                    <div class="scenario-list">
+                        <div class="scenario-item scenario-pending" id="scenario-1">
+                            <span>1-3: Far Outside</span>
+                            <span>❌</span>
+                        </div>
+                        <div class="scenario-item scenario-pending" id="scenario-2">
+                            <span>4-6: Approaching</span>
+                            <span>🔄</span>
+                        </div>
+                        <div class="scenario-item scenario-pending" id="scenario-3">
+                            <span>7-9: Uncertain Zone</span>
+                            <span>❓</span>
+                        </div>
+                        <div class="scenario-item scenario-pending" id="scenario-4">
+                            <span>10-12: Inside</span>
+                            <span>✅</span>
+                        </div>
+                        <div class="scenario-item scenario-pending" id="scenario-5">
+                            <span>13-15: Leaving</span>
+                            <span>↗️</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3>🎯 Current Geofence Status</h3>
+                    <div class="geofence-status" id="geofenceStatus">
+                        <div style="font-weight: bold; margin-bottom: 10px;">Building Entry Geofence</div>
+                        <div>Status: <span class="status-badge badge-outside" id="statusBadge">OUTSIDE</span></div>
+                        <div style="margin-top: 10px; font-size: 12px;">
+                            <div>Distance to center: <span id="distanceValue">--</span>m</div>
+                            <div>Confidence: <span id="confidenceValue">--</span>%</div>
+                            <div>Triggered: <span id="triggeredValue">None</span></div>
+                            <div>Recommendation: <span id="recommendationValue">--</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3>📈 API Processing Results</h3>
+                    <div style="font-size: 12px; background: #f8fafc; padding: 10px; border-radius: 6px;">
+                        <div><strong>Quality:</strong> <span id="qualityResult">--</span></div>
+                        <div><strong>Fusion:</strong> <span id="fusionResult">--</span></div>
+                        <div><strong>Movement:</strong> <span id="movementResult">--</span></div>
+                        <div><strong>Geofence:</strong> <span id="geofenceResult">--</span></div>
+                    </div>
+                </div>
+
+                <div class="logs" id="logs">
+                    <div class="log-entry">
+                        <span class="log-timestamp">[Ready]</span> Smart Geofence Journey Simulation initialized
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const API_BASE = 'https://geoguardian-pa0d.onrender.com/api/v1';
+        
+        let map;
+        let geofence;
+        let simulationInterval;
+        let currentStep = 0;
+        let isSimulating = false;
+        let locationHistory = [];
+        let geofenceStates = [];
+        let pathPolyline;
+        let currentMarker;
+        
+        const TEST_GEOFENCE = {
+            id: 'building-entry',
+            name: 'Building Entry',
+            center: { latitude: 37.7749, longitude: -122.4194 },
+            radius: 50,
+            metadata: {
+                type: 'building',
+                priority: 'high',
+                minDwellTime: 3,
+                exitGracePeriod: 2
+            }
+        };
+
+        const JOURNEY_PATH = [
+            { lat: 37.7739, lng: -122.4184, noise: 25 }, 
+            { lat: 37.7741, lng: -122.4186, noise: 20 }, 
+            { lat: 37.7743, lng: -122.4188, noise: 18 },
+            
+            { lat: 37.7745, lng: -122.4190, noise: 15 }, 
+            { lat: 37.7746, lng: -122.4191, noise: 12 }, 
+            { lat: 37.7747, lng: -122.4192, noise: 15 }, 
+            
+            { lat: 37.7748, lng: -122.4193, noise: 18 },
+            { lat: 37.7748, lng: -122.4193, noise: 22 },
+            { lat: 37.7748, lng: -122.4193, noise: 20 }, 
+            
+            { lat: 37.7749, lng: -122.4194, noise: 12 }, 
+            { lat: 37.7749, lng: -122.4194, noise: 8 },  
+            { lat: 37.7749, lng: -122.4194, noise: 10 }, 
+            
+            { lat: 37.7750, lng: -122.4195, noise: 15 }, 
+            { lat: 37.7751, lng: -122.4196, noise: 18 },
+            { lat: 37.7753, lng: -122.4198, noise: 20 }  
+        ];
+
+        function initMap() {
+            map = L.map('map').setView([37.7749, -122.4194], 16);
+            
+            L.tileLayer('data:image/svg+xml;base64,' + btoa(`
+                <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256">
+                    <defs>
+                        <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+                            <path d="M 32 0 L 0 0 0 32" fill="none" stroke="#e2e8f0" stroke-width="1"/>
+                        </pattern>
+                    </defs>
+                    <rect width="256" height="256" fill="#f8fafc"/>
+                    <rect width="256" height="256" fill="url(#grid)"/>
+                    <text x="128" y="130" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#6b7280">Journey Demo</text>
+                </svg>
+            `), {
+                attribution: 'Smart Geofence Journey Demo'
+            }).addTo(map);
+
+            drawGeofence();
+            drawJourneyPath();
+            
+            log('Journey simulation map initialized');
+        }
+
+        function drawGeofence() {
+            const center = [TEST_GEOFENCE.center.latitude, TEST_GEOFENCE.center.longitude];
+            const radius = TEST_GEOFENCE.radius;
+            
+            const buffer = Math.max(20, 15 * 1.5);
+            const innerRadius = Math.max(0, radius - buffer);
+            const outerRadius = radius + buffer;
+
+            L.circle(center, {
+                radius: outerRadius,
+                fillColor: '#fbbf24',
+                color: '#f59e0b',
+                weight: 2,
+                opacity: 0.8,
+                fillOpacity: 0.15
+            }).addTo(map);
+
+            L.marker([center[0] + 0.0008, center[1]], {
+                icon: L.divIcon({
+                    className: 'radius-label',
+                    html: `<div style="background: rgba(251, 191, 36, 0.9); color: #92400e; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold;">❓ ${outerRadius.toFixed(0)}m</div>`,
+                    iconSize: [60, 20],
+                    iconAnchor: [0, 10]
+                })
+            }).addTo(map);
+
+            L.circle(center, {
+                radius: radius,
+                fillColor: '#3b82f6',
+                color: '#2563eb',
+                weight: 3,
+                opacity: 0.9,
+                fillOpacity: 0.2
+            }).addTo(map);
+
+            L.marker([center[0] - 0.0005, center[1]], {
+                icon: L.divIcon({
+                    className: 'radius-label',
+                    html: `<div style="background: rgba(59, 130, 246, 0.9); color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold;">🔄 ${radius}m</div>`,
+                    iconSize: [50, 20],
+                    iconAnchor: [0, 10]
+                })
+            }).addTo(map);
+
+            if (innerRadius > 10) {
+                L.circle(center, {
+                    radius: innerRadius,
+                    fillColor: '#10b981',
+                    color: '#059669',
+                    weight: 2,
+                    opacity: 0.8,
+                    fillOpacity: 0.25
+                }).addTo(map);
+
+                L.marker([center[0] + 0.0005, center[1]], {
+                    icon: L.divIcon({
+                        className: 'radius-label',
+                        html: `<div style="background: rgba(16, 185, 129, 0.9); color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold;">✅ ${innerRadius.toFixed(0)}m</div>`,
+                        iconSize: [50, 20],
+                        iconAnchor: [0, 10]
+                    })
+                }).addTo(map);
+            }
+
+            L.marker(center, {
+                icon: L.divIcon({
+                    className: 'geofence-center',
+                    html: `<div style="background: #3b82f6; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">🎯</div>`,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                })
+            }).addTo(map);
+
+            L.marker([center[0] - 0.0012, center[1]], {
+                icon: L.divIcon({
+                    className: 'geofence-name',
+                    html: `<div style="background: rgba(255, 255, 255, 0.95); color: #1f2937; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; border: 1px solid #d1d5db; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">${TEST_GEOFENCE.name}</div>`,
+                    iconSize: [100, 25],
+                    iconAnchor: [0, 12]
+                })
+            }).addTo(map);
+        }
+
+        function drawJourneyPath() {
+            const pathCoords = JOURNEY_PATH.map(point => [point.lat, point.lng]);
+            
+            pathPolyline = L.polyline(pathCoords, {
+                color: '#6b7280',
+                weight: 3,
+                opacity: 0.5,
+                dashArray: '10, 10'
+            }).addTo(map);
+
+            JOURNEY_PATH.forEach((point, index) => {
+                L.marker([point.lat, point.lng], {
+                    icon: L.divIcon({
+                        className: 'step-marker',
+                        html: `<div style="background: #6b7280; color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; border: 2px solid white; opacity: 0.7;">${index + 1}</div>`,
+                        iconSize: [20, 20],
+                        iconAnchor: [10, 10]
+                    })
+                }).addTo(map);
+            });
+        }
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type ? `log-${type}` : ''}`;
+            logEntry.innerHTML = `<span class="log-timestamp">[${timestamp}]</span> ${message}`;
+            document.getElementById('logs').appendChild(logEntry);
+            document.getElementById('logs').scrollTop = document.getElementById('logs').scrollHeight;
+        }
+
+        function updateStatus(message, type = 'info') {
+            const statusEl = document.getElementById('currentStatus');
+            statusEl.textContent = message;
+            statusEl.className = `status-indicator status-${type}`;
+        }
+
+        function generateLocationReading(step) {
+            const pathPoint = JOURNEY_PATH[step];
+            const platform = document.getElementById('platformType').value;
+            
+            const noiseScale = pathPoint.noise / 111000; 
+            const noiseLat = (Math.random() - 0.5) * 2 * noiseScale;
+            const noiseLng = (Math.random() - 0.5) * 2 * noiseScale;
+            
+            return {
+                latitude: pathPoint.lat + noiseLat,
+                longitude: pathPoint.lng + noiseLng,
+                accuracy: pathPoint.noise + (Math.random() - 0.5) * 10, 
+                timestamp: Date.now(),
+                speed: step > 0 ? Math.random() * 2 : 0,
+                heading: null,
+                altitude: 10 + Math.random() * 5,
+                altitudeAccuracy: 3,
+                platform: platform,
+                source: 'gps'
+            };
+        }
+
+        function cleanLocationData(location) {
+            return {
+                latitude: location.latitude,
+                longitude: location.longitude,
+                accuracy: location.accuracy,
+                timestamp: location.timestamp,
+                speed: location.speed,
+                heading: location.heading,
+                altitude: location.altitude,
+                altitudeAccuracy: location.altitudeAccuracy,
+                platform: location.platform,
+                source: location.source
+            };
+        }
+
+        async function makeAPIRequest(endpoint, method = 'GET', data = null) {
+            const url = `${API_BASE}${endpoint}`;
+            
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            };
+            
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+            
+            const response = await fetch(url, options);
+            
+            if (!response.ok) {
+                throw new Error(`API Error: ${response.status}`);
+            }
+            
+            return await response.json();
+        }
+
+        async function processLocationPipeline(rawLocation) {
+            const results = {
+                quality: null,
+                fusion: null,
+                movement: null,
+                geofence: null
+            };
+
+            try {
+                const cleanLocation = cleanLocationData(rawLocation);
+
+                const qualityResult = await makeAPIRequest('/location/test', 'POST', {
+                    location: cleanLocation,
+                    requestId: `sim-quality-${currentStep}`
+                });
+                results.quality = qualityResult.data;
+
+                let processedLocation = rawLocation;
+                if (locationHistory.length > 0) {
+                    const cleanHistory = locationHistory.slice(-4).map(cleanLocationData);
+                    
+                    const fusionResult = await makeAPIRequest('/fusion/fused', 'POST', {
+                        currentLocation: cleanLocation,
+                        locationHistory: cleanHistory,
+                        fusionOptions: {
+                            enableWeightedAveraging: true,
+                            enableKalmanFilter: false,
+                            aggressiveness: 'moderate'
+                        },
+                        requestId: `sim-fusion-${currentStep}`
+                    });
+                    
+                    if (fusionResult.success && fusionResult.data.fusion.appliedCorrections.length > 0) {
+                        processedLocation = fusionResult.data.fused.location;
+                        results.fusion = fusionResult.data;
+                    }
+                }
+
+                if (locationHistory.length > 0) {
+                    const lastLocation = cleanLocationData(locationHistory[locationHistory.length - 1]);
+                    const cleanProcessed = cleanLocationData(processedLocation);
+                    
+                    const movementResult = await makeAPIRequest('/location/analyze-movement', 'POST', {
+                        previousLocation: lastLocation,
+                        currentLocation: cleanProcessed,
+                        contextHints: {
+                            transportMode: 'walking',
+                            environment: 'urban'
+                        },
+                        requestId: `sim-movement-${currentStep}`
+                    });
+                    results.movement = movementResult.data;
+                }
+
+                const cleanProcessed = cleanLocationData(processedLocation);
+                const cleanHistory = locationHistory.slice(-3).map(cleanLocationData);
+                
+                const geofenceResult = await makeAPIRequest('/geofence/evaluate', 'POST', {
+                    currentLocation: cleanProcessed,
+                    geofences: [TEST_GEOFENCE],
+                    locationHistory: cleanHistory,
+                    previousStates: geofenceStates,
+                    options: {
+                        enableAutoFusion: false,
+                        bufferStrategy: 'moderate',
+                        requireHighAccuracy: false
+                    },
+                    requestId: `sim-geofence-${currentStep}`
+                });
+                
+                if (geofenceResult.success) {
+                    results.geofence = geofenceResult.data;
+                    geofenceStates = geofenceResult.data.updatedStates;
+                }
+
+                return { processedLocation, results };
+
+            } catch (error) {
+                log(`API processing failed: ${error.message}`, 'error');
+                return { processedLocation: rawLocation, results };
+            }
+        }
+
+        function updateMapMarker(location, status) {
+            if (currentMarker) {
+                map.removeLayer(currentMarker);
+            }
+
+            const statusColors = {
+                outside: '#dc2626',
+                uncertain: '#f59e0b',
+                approaching: '#3b82f6',
+                inside: '#10b981',
+                leaving: '#ec4899'
+            };
+
+            const statusEmojis = {
+                outside: '❌',
+                uncertain: '❓',
+                approaching: '🔄',
+                inside: '✅',
+                leaving: '↗️'
+            };
+
+            const color = statusColors[status] || '#6b7280';
+            const emoji = statusEmojis[status] || '📍';
+
+            currentMarker = L.marker([location.latitude, location.longitude], {
+                icon: L.divIcon({
+                    className: 'current-position',
+                    html: `<div style="background: ${color}; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 14px; border: 3px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.3); animation: pulse 2s infinite;">${emoji}</div>`,
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14]
+                })
+            }).addTo(map);
+
+            L.circle([location.latitude, location.longitude], {
+                radius: location.accuracy,
+                fillColor: color,
+                color: color,
+                weight: 2,
+                opacity: 0.6,
+                fillOpacity: 0.1
+            }).addTo(map);
+
+            map.setView([location.latitude, location.longitude], map.getZoom());
+        }
+
+        function updateSimulationUI(step, location, results) {
+            const progress = (step / JOURNEY_PATH.length) * 100;
+            document.getElementById('progressFill').style.width = `${progress}%`;
+            document.getElementById('progressText').textContent = `${step} / ${JOURNEY_PATH.length} steps`;
+            document.getElementById('stepNumber').textContent = step;
+
+            const scenarioNumber = Math.ceil(step / 3);
+            for (let i = 1; i <= 5; i++) {
+                const scenarioEl = document.getElementById(`scenario-${i}`);
+                if (i < scenarioNumber) {
+                    scenarioEl.className = 'scenario-item scenario-complete';
+                } else if (i === scenarioNumber) {
+                    scenarioEl.className = 'scenario-item scenario-active';
+                } else {
+                    scenarioEl.className = 'scenario-item scenario-pending';
+                }
+            }
+
+            if (results.geofence && results.geofence.evaluations.length > 0) {
+                const evaluation = results.geofence.evaluations[0];
+                document.getElementById('currentDistance').textContent = evaluation.debugInfo.distanceToCenter.toFixed(1);
+                document.getElementById('currentConfidence').textContent = Math.round(evaluation.confidence * 100);
+                
+                const statusBadge = document.getElementById('statusBadge');
+                statusBadge.textContent = evaluation.status.toUpperCase();
+                statusBadge.className = `status-badge badge-${evaluation.status}`;
+                
+                document.getElementById('distanceValue').textContent = evaluation.debugInfo.distanceToCenter.toFixed(1);
+                document.getElementById('confidenceValue').textContent = Math.round(evaluation.confidence * 100);
+                document.getElementById('triggeredValue').textContent = evaluation.triggered !== 'none' ? evaluation.triggered.toUpperCase() : 'None';
+                document.getElementById('recommendationValue').textContent = evaluation.recommendation.replace('_', ' ').toUpperCase();
+            }
+
+            if (results.quality) {
+                document.getElementById('processingTime').textContent = results.quality.processingTime;
+            }
+
+            document.getElementById('qualityResult').textContent = results.quality ? 
+                `${results.quality.quality.grade} (${results.quality.quality.score})` : 'N/A';
+            
+            document.getElementById('fusionResult').textContent = results.fusion ? 
+                `${results.fusion.fusion.appliedCorrections.length} corrections` : 'No fusion';
+            
+            document.getElementById('movementResult').textContent = results.movement ? 
+                (results.movement.accepted ? 'Accepted' : 'Anomaly') : 'No analysis';
+            
+            document.getElementById('geofenceResult').textContent = results.geofence ? 
+                `${results.geofence.evaluations[0].status}` : 'No evaluation';
+        }
+
+        async function performSimulationStep() {
+            if (currentStep >= JOURNEY_PATH.length) {
+                stopSimulation();
+                return;
+            }
+
+            updateStatus(`Processing step ${currentStep + 1}...`, 'info');
+            
+            const rawLocation = generateLocationReading(currentStep);
+            
+            const { processedLocation, results } = await processLocationPipeline(rawLocation);
+            
+            locationHistory.push(processedLocation);
+            if (locationHistory.length > 10) {
+                locationHistory = locationHistory.slice(-10);
+            }
+
+            const geofenceStatus = results.geofence && results.geofence.evaluations.length > 0 ? 
+                results.geofence.evaluations[0].status : 'unknown';
+            
+            updateMapMarker(processedLocation, geofenceStatus);
+            updateSimulationUI(currentStep + 1, processedLocation, results);
+            
+            const distance = results.geofence && results.geofence.evaluations.length > 0 ? 
+                results.geofence.evaluations[0].debugInfo.distanceToCenter.toFixed(1) : '?';
+            const confidence = results.geofence && results.geofence.evaluations.length > 0 ? 
+                Math.round(results.geofence.evaluations[0].confidence * 100) : '?';
+            
+            log(`Step ${currentStep + 1}: ${geofenceStatus.toUpperCase()} | ${distance}m | ${confidence}% confidence`, 'success');
+            
+            if (results.geofence && results.geofence.evaluations.length > 0) {
+                const triggered = results.geofence.evaluations[0].triggered;
+                if (triggered !== 'none') {
+                    log(`🎯 TRIGGERED: ${triggered.toUpperCase()} event!`, 'warning');
+                }
+            }
+
+            currentStep++;
+            updateStatus(`Step ${currentStep} complete`, 'success');
+        }
+
+        function startSimulation() {
+            if (isSimulating) return;
+            
+            isSimulating = true;
+            const speed = parseInt(document.getElementById('simulationSpeed').value);
+            
+            log('Starting smart geofence journey simulation...', 'success');
+            updateStatus('Simulation started', 'success');
+            
+            document.getElementById('startSimulation').disabled = true;
+            document.getElementById('stopSimulation').disabled = false;
+            
+            simulationInterval = setInterval(performSimulationStep, speed);
+        }
+
+        function stopSimulation() {
+            if (!isSimulating) return;
+            
+            isSimulating = false;
+            
+            if (simulationInterval) {
+                clearInterval(simulationInterval);
+                simulationInterval = null;
+            }
+            
+            log('Simulation stopped', 'warning');
+            updateStatus('Simulation stopped', 'warning');
+            
+            document.getElementById('startSimulation').disabled = false;
+            document.getElementById('stopSimulation').disabled = true;
+        }
+
+        function resetSimulation() {
+            stopSimulation();
+            
+            currentStep = 0;
+            locationHistory = [];
+            geofenceStates = [];
+            
+            if (currentMarker) {
+                map.removeLayer(currentMarker);
+                currentMarker = null;
+            }
+            
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('progressText').textContent = '0 / 15 steps';
+            document.getElementById('stepNumber').textContent = '0';
+            document.getElementById('currentDistance').textContent = '--';
+            document.getElementById('currentConfidence').textContent = '--';
+            document.getElementById('processingTime').textContent = '--';
+            
+            for (let i = 1; i <= 5; i++) {
+                document.getElementById(`scenario-${i}`).className = 'scenario-item scenario-pending';
+            }
+            
+            const statusBadge = document.getElementById('statusBadge');
+            statusBadge.textContent = 'OUTSIDE';
+            statusBadge.className = 'status-badge badge-outside';
+            
+            document.getElementById('distanceValue').textContent = '--';
+            document.getElementById('confidenceValue').textContent = '--';
+            document.getElementById('triggeredValue').textContent = 'None';
+            document.getElementById('recommendationValue').textContent = '--';
+            
+            document.getElementById('qualityResult').textContent = '--';
+            document.getElementById('fusionResult').textContent = '--';
+            document.getElementById('movementResult').textContent = '--';
+            document.getElementById('geofenceResult').textContent = '--';
+            
+            log('Simulation reset', 'info');
+            updateStatus('Ready to start new simulation', 'info');
+        }
+
+        document.getElementById('startSimulation').addEventListener('click', startSimulation);
+        document.getElementById('stopSimulation').addEventListener('click', stopSimulation);
+        document.getElementById('resetSimulation').addEventListener('click', resetSimulation);
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            log('Smart Geofence Journey Simulation ready');
+            updateStatus('Ready to start journey', 'info');
+        });
+
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes pulse {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.1); }
+                100% { transform: scale(1); }
+            }
+        `;
+        document.head.appendChild(style);
+
+    </script>
+</body>
+</html>
