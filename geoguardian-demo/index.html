@@ -19,13 +19,14 @@
             <button class="tab-button active" onclick="showDemo('quality')">📊 GPS Quality</button>
             <button class="tab-button" onclick="showDemo('fusion')">🔗 Location Fusion</button>
             <button class="tab-button" onclick="showDemo('batch')">📈 Batch Tracking</button>
+            <button class="tab-button" onclick="showDemo('geofence')">🎯 Geofencing</button>
+            <button class="tab-button" onclick="showDemo('adaptive')">⚙️ Optimization</button>
         </div>
 
         <div id="status" class="status info" style="display: none;">
             Ready to test location services
         </div>
 
-        <!-- GPS Quality Demo -->
         <div id="qualityDemo" class="demo-section active">
             <div class="api-section">
                 <h3>📊 GPS Signal Quality Analysis</h3>
@@ -40,7 +41,6 @@
             </div>
         </div>
 
-        <!-- Location Fusion Demo -->
         <div id="fusionDemo" class="demo-section">
             <div class="api-section">
                 <h3>🔗 Location Fusion & Correction</h3>
@@ -80,7 +80,6 @@
             </div>
         </div>
 
-        <!-- Batch Tracking Demo -->
         <div id="batchDemo" class="demo-section">
             <div class="api-section">
                 <h3>📈 Batch Movement Analysis</h3>
@@ -138,6 +137,129 @@
                 </div>
 
                 <div id="batchContainer" class="batch-container" style="display: none;"></div>
+            </div>
+        </div>
+
+        <div id="geofenceDemo" class="demo-section">
+            <div class="api-section">
+                <h3>🎯 Smart Geofence Evaluation</h3>
+                <p>Test the <code>/api/v1/geofence/evaluate</code> endpoint with adaptive buffer zones and intelligent boundary detection.</p>
+
+                <div class="settings">
+                    <div class="setting-group">
+                        <label for="geofenceRadius">Geofence Radius (meters):</label>
+                        <input type="number" id="geofenceRadius" value="50" min="10" max="500">
+                        <small>Boundary radius around center point</small>
+                    </div>
+                    <div class="setting-group">
+                        <label for="geofenceBufferMultiplier">Buffer Multiplier:</label>
+                        <select id="geofenceBufferMultiplier">
+                            <option value="">Auto (based on GPS quality)</option>
+                            <option value="1.2">Conservative (1.2x)</option>
+                            <option value="2.0">Moderate (2.0x)</option>
+                            <option value="3.0">Aggressive (3.0x)</option>
+                        </select>
+                        <small>How much buffer zone to add</small>
+                    </div>
+                    <div class="setting-group">
+                        <label for="geofenceGracePeriod">Exit Grace Period (seconds):</label>
+                        <input type="number" id="geofenceGracePeriod" value="30" min="5" max="120">
+                        <small>Time before confirming exit</small>
+                    </div>
+                    <div class="setting-group">
+                        <label>
+                            <input type="checkbox" id="geofenceMultiCheck" checked> Multi-Check Verification
+                        </label>
+                        <small>Request second reading for boundary zones</small>
+                    </div>
+                </div>
+
+                <div class="geofence-setup">
+                    <button class="button secondary" id="setGeofenceCenter" disabled>📍 Set Center to Current Location</button>
+                    <button class="button" id="testGeofence" disabled>🎯 Test Geofence Status</button>
+                    <button class="button" id="startGeofenceMonitoring" disabled>📡 Start Monitoring</button>
+                    <button class="button danger" id="stopGeofenceMonitoring" disabled>⏹️ Stop Monitoring</button>
+                </div>
+
+                <div id="geofenceCenter" class="status info" style="display: none;">
+                    <strong>Geofence Center:</strong> <span id="geofenceCenterCoords">Not set</span>
+                </div>
+
+                <div id="geofenceDisplay" style="display: none;"></div>
+                <div id="geofenceResult" class="result-display"></div>
+            </div>
+        </div>
+
+        <div id="adaptiveDemo" class="demo-section">
+            <div class="api-section">
+                <h3>⚙️ Pipeline Optimization</h3>
+                <p>Test the <code>/api/v1/adaptive/optimize</code> endpoint for context-aware pipeline tuning.</p>
+
+                <div class="settings">
+                    <div class="setting-group">
+                        <label for="optimizationMode">Optimization Mode:</label>
+                        <select id="optimizationMode">
+                            <option value="adaptive" selected>Adaptive (Auto-select)</option>
+                            <option value="high_accuracy">High Accuracy</option>
+                            <option value="battery_saver">Battery Saver</option>
+                            <option value="balanced">Balanced</option>
+                        </select>
+                        <small>How to prioritize accuracy vs battery</small>
+                    </div>
+                    <div class="setting-group">
+                        <label for="targetUseCase">Target Use Case:</label>
+                        <select id="targetUseCase">
+                            <option value="geofencing" selected>Geofencing</option>
+                            <option value="navigation">Navigation</option>
+                            <option value="tracking">Tracking</option>
+                            <option value="general">General</option>
+                        </select>
+                        <small>What you're using location for</small>
+                    </div>
+                    <div class="setting-group">
+                        <label for="contextBattery">Battery Level (%):</label>
+                        <input type="number" id="contextBattery" value="75" min="0" max="100">
+                        <small>Current device battery</small>
+                    </div>
+                    <div class="setting-group">
+                        <label for="contextMovement">Movement Pattern:</label>
+                        <select id="contextMovement">
+                            <option value="">Auto-detect</option>
+                            <option value="stationary">Stationary</option>
+                            <option value="walking">Walking</option>
+                            <option value="cycling">Cycling</option>
+                            <option value="driving">Driving</option>
+                        </select>
+                        <small>Current movement behavior</small>
+                    </div>
+                    <div class="setting-group">
+                        <label for="contextEnvironment">Environment:</label>
+                        <select id="contextEnvironment">
+                            <option value="">Auto-detect</option>
+                            <option value="indoor">Indoor</option>
+                            <option value="urban">Urban</option>
+                            <option value="outdoor">Outdoor</option>
+                            <option value="rural">Rural</option>
+                            <option value="highway">Highway</option>
+                        </select>
+                        <small>Current environment</small>
+                    </div>
+                    <div class="setting-group">
+                        <label for="contextPriority">App Priority:</label>
+                        <select id="contextPriority">
+                            <option value="foreground" selected>Foreground</option>
+                            <option value="background">Background</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                        <small>How important is this app</small>
+                    </div>
+                </div>
+
+                <button class="button secondary" id="testOptimization" disabled>🔍 Get Recommendations</button>
+                <button class="button" id="analyzeContext" disabled>📊 Analyze Context</button>
+
+                <div id="optimizationDisplay" style="display: none;"></div>
+                <div id="optimizationResult" class="result-display"></div>
             </div>
         </div>
     </div>

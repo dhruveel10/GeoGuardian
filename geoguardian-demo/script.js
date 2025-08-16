@@ -4,10 +4,14 @@ let qualityTrackingInterval = null;
 let movementTrackingInterval = null;
 let batchTrackingInterval = null;
 let fusionTrackingInterval = null;
+let geofenceMonitoringInterval = null;
 let countdownInterval = null;
 let batchNumber = 0;
 let totalDistance = 0;
 let batchStats = { total: 0, normal: 0, warning: 0, anomaly: 0 };
+let geofenceCenter = null;
+let geofenceState = 'unknown';
+let geofenceStateTimestamp = null;
 
 const API_CONFIG = {
     BASE_URL: 'https://geoguardian-pa0d.onrender.com',
@@ -46,7 +50,31 @@ const elements = {
     totalBatches: document.getElementById('totalBatches'),
     normalBatches: document.getElementById('normalBatches'),
     anomalyBatches: document.getElementById('anomalyBatches'),
-    totalDistance: document.getElementById('totalDistance')
+    totalDistance: document.getElementById('totalDistance'),
+    
+    setGeofenceCenter: document.getElementById('setGeofenceCenter'),
+    testGeofence: document.getElementById('testGeofence'),
+    startGeofenceMonitoring: document.getElementById('startGeofenceMonitoring'),
+    stopGeofenceMonitoring: document.getElementById('stopGeofenceMonitoring'),
+    geofenceRadius: document.getElementById('geofenceRadius'),
+    geofenceBufferMultiplier: document.getElementById('geofenceBufferMultiplier'),
+    geofenceGracePeriod: document.getElementById('geofenceGracePeriod'),
+    geofenceMultiCheck: document.getElementById('geofenceMultiCheck'),
+    geofenceCenter: document.getElementById('geofenceCenter'),
+    geofenceCenterCoords: document.getElementById('geofenceCenterCoords'),
+    geofenceDisplay: document.getElementById('geofenceDisplay'),
+    geofenceResult: document.getElementById('geofenceResult'),
+    
+    testOptimization: document.getElementById('testOptimization'),
+    analyzeContext: document.getElementById('analyzeContext'),
+    optimizationMode: document.getElementById('optimizationMode'),
+    targetUseCase: document.getElementById('targetUseCase'),
+    contextBattery: document.getElementById('contextBattery'),
+    contextMovement: document.getElementById('contextMovement'),
+    contextEnvironment: document.getElementById('contextEnvironment'),
+    contextPriority: document.getElementById('contextPriority'),
+    optimizationDisplay: document.getElementById('optimizationDisplay'),
+    optimizationResult: document.getElementById('optimizationResult')
 };
 
 function log(message, type = 'info') {
@@ -191,6 +219,54 @@ function getFusionOptions() {
     };
 }
 
+function getGeofenceOptions() {
+    const options = {};
+    
+    if (elements.geofenceBufferMultiplier.value && elements.geofenceBufferMultiplier.value !== '') {
+        options.customBufferMultiplier = parseFloat(elements.geofenceBufferMultiplier.value);
+    }
+    
+    options.requireMultiCheck = elements.geofenceMultiCheck.checked;
+    
+    const gracePeriod = parseInt(elements.geofenceGracePeriod.value);
+    if (!isNaN(gracePeriod) && gracePeriod >= 0) {
+        options.exitGracePeriod = gracePeriod;
+    }
+    
+    if (geofenceState && geofenceState !== 'unknown') {
+        options.previousState = geofenceState;
+        if (geofenceStateTimestamp) {
+            options.previousStateTimestamp = geofenceStateTimestamp;
+        }
+    }
+    
+    return options;
+}
+
+function getOptimizationContext() {
+    const context = {
+        batteryLevel: parseInt(elements.contextBattery.value),
+        appPriority: elements.contextPriority.value
+    };
+    
+    if (elements.contextMovement.value) {
+        context.movementPattern = elements.contextMovement.value;
+    }
+    
+    if (elements.contextEnvironment.value) {
+        context.environment = elements.contextEnvironment.value;
+    }
+    
+    getBatteryInfo().then(batteryInfo => {
+        if (batteryInfo) {
+            context.batteryLevel = batteryInfo.level;
+            context.isCharging = batteryInfo.charging;
+        }
+    });
+    
+    return context;
+}
+
 async function testSignalQuality() {
     try {
         showStatus('Testing signal quality...', 'info');
@@ -270,6 +346,262 @@ async function testFusionComparison() {
     } catch (error) {
         log(`Comparison failed: ${error.message}`, 'error');
         showStatus(`Comparison failed: ${error.message}`, 'error');
+    }
+}
+
+async function setGeofenceCenterToCurrent() {
+    try {
+        showStatus('Setting geofence center to current location...', 'info');
+        const location = await collectLocationReading();
+        
+        geofenceCenter = {
+            latitude: location.latitude,
+            longitude: location.longitude
+        };
+        
+        elements.geofenceCenterCoords.textContent = 
+            `${geofenceCenter.latitude.toFixed(6)}, ${geofenceCenter.longitude.toFixed(6)}`;
+        elements.geofenceCenter.style.display = 'block';
+        
+        elements.testGeofence.disabled = false;
+        elements.startGeofenceMonitoring.disabled = false;
+        
+        log(`Geofence center set to: ${geofenceCenter.latitude.toFixed(6)}, ${geofenceCenter.longitude.toFixed(6)}`);
+        showStatus('Geofence center set successfully!', 'success');
+        
+    } catch (error) {
+        log(`Failed to set geofence center: ${error.message}`, 'error');
+        showStatus(`Failed to set geofence center: ${error.message}`, 'error');
+    }
+}
+
+async function testGeofenceStatus() {
+    if (!geofenceCenter) {
+        showStatus('Please set geofence center first', 'error');
+        return;
+    }
+    
+    try {
+        showStatus('Evaluating geofence status...', 'info');
+        const location = await collectLocationReading();
+        
+        const payload = {
+            location: {
+                latitude: location.latitude,
+                longitude: location.longitude,
+                accuracy: location.accuracy,
+                timestamp: location.timestamp,
+                speed: location.speed,
+                heading: location.heading,
+                altitude: location.altitude,
+                altitudeAccuracy: location.altitudeAccuracy,
+                platform: location.platform || 'web',
+                source: location.source || 'gps'
+            },
+            geofence: {
+                center: {
+                    latitude: geofenceCenter.latitude,
+                    longitude: geofenceCenter.longitude
+                },
+                radius: parseInt(elements.geofenceRadius.value),
+                id: 'demo-geofence',
+                name: 'Demo Geofence'
+            },
+            evaluationOptions: getGeofenceOptions(),
+            requestId: `geofence-${Date.now()}`
+        };
+
+        console.log('Sending geofence payload:', JSON.stringify(payload, null, 2));
+
+        const result = await makeAPIRequest('/api/v1/geofence/evaluate', 'POST', payload);
+
+        displayGeofenceResult(result);
+        
+        if (result.success && result.data) {
+            geofenceState = result.data.status;
+            geofenceStateTimestamp = Date.now();
+        }
+        
+        log(`Geofence status: ${result.data?.status} (confidence: ${result.data?.confidence})`);
+        showStatus('Geofence evaluation complete', 'success');
+
+    } catch (error) {
+        log(`Geofence evaluation failed: ${error.message}`, 'error');
+        showStatus(`Geofence evaluation failed: ${error.message}`, 'error');
+        console.error('Full error details:', error);
+    }
+}
+
+async function testPipelineOptimization() {
+    try {
+        showStatus('Getting optimization recommendations...', 'info');
+        const location = await collectLocationReading();
+        addToLocationHistory(location);
+        
+        const result = await makeAPIRequest('/api/v1/adaptive/optimize', 'POST', {
+            currentLocation: location,
+            locationHistory: locationHistory.slice(-3),
+            mode: elements.optimizationMode.value,
+            context: getOptimizationContext(),
+            targetUseCase: elements.targetUseCase.value,
+            requestId: `optimize-${Date.now()}`
+        });
+
+        displayOptimizationResult(result);
+        log(`Recommended mode: ${result.data?.recommendedMode}`);
+        showStatus('Optimization recommendations generated', 'success');
+
+    } catch (error) {
+        log(`Optimization failed: ${error.message}`, 'error');
+        showStatus(`Optimization failed: ${error.message}`, 'error');
+    }
+}
+
+async function analyzeCurrentContext() {
+    try {
+        showStatus('Analyzing current context...', 'info');
+        const location = await collectLocationReading();
+        
+        const result = await makeAPIRequest('/api/v1/adaptive/context-analysis', 'POST', {
+            currentLocation: location,
+            locationHistory: locationHistory.slice(-3),
+            context: getOptimizationContext()
+        });
+
+        displayContextAnalysis(result);
+        log(`Context analysis: ${result.data?.detectedPatterns?.environment} environment, ${result.data?.detectedPatterns?.movementPattern} movement`);
+        showStatus('Context analysis complete', 'success');
+
+    } catch (error) {
+        log(`Context analysis failed: ${error.message}`, 'error');
+        showStatus(`Context analysis failed: ${error.message}`, 'error');
+    }
+}
+
+function validateGeofenceInputs() {
+    const errors = [];
+    
+    if (!geofenceCenter) {
+        errors.push('Geofence center not set');
+    }
+    
+    const radius = parseInt(elements.geofenceRadius.value);
+    if (isNaN(radius) || radius <= 0 || radius > 10000) {
+        errors.push('Invalid radius: must be between 1 and 10000 meters');
+    }
+    
+    const gracePeriod = parseInt(elements.geofenceGracePeriod.value);
+    if (isNaN(gracePeriod) || gracePeriod < 0) {
+        errors.push('Invalid grace period: must be 0 or greater');
+    }
+    
+    if (elements.geofenceBufferMultiplier.value !== '' && elements.geofenceBufferMultiplier.value !== null) {
+        const multiplier = parseFloat(elements.geofenceBufferMultiplier.value);
+        if (isNaN(multiplier) || multiplier <= 0) {
+            errors.push('Invalid buffer multiplier: must be greater than 0');
+        }
+    }
+    
+    return errors;
+}
+
+async function testGeofenceStatusEnhanced() {
+    const validationErrors = validateGeofenceInputs();
+    if (validationErrors.length > 0) {
+        const errorMsg = `Input validation failed: ${validationErrors.join(', ')}`;
+        log(errorMsg, 'error');
+        showStatus(errorMsg, 'error');
+        return;
+    }
+    
+    try {
+        showStatus('Evaluating geofence status...', 'info');
+        const location = await collectLocationReading();
+        
+        const payload = {
+            location: {
+                latitude: parseFloat(location.latitude),
+                longitude: parseFloat(location.longitude),
+                accuracy: parseFloat(location.accuracy),
+                timestamp: parseInt(location.timestamp),
+                speed: location.speed ? parseFloat(location.speed) : null,
+                heading: location.heading ? parseFloat(location.heading) : null,
+                altitude: location.altitude ? parseFloat(location.altitude) : null,
+                altitudeAccuracy: location.altitudeAccuracy ? parseFloat(location.altitudeAccuracy) : null,
+                platform: location.platform || 'web',
+                source: location.source || 'gps'
+            },
+            geofence: {
+                center: {
+                    latitude: parseFloat(geofenceCenter.latitude),
+                    longitude: parseFloat(geofenceCenter.longitude)
+                },
+                radius: parseInt(elements.geofenceRadius.value)
+            },
+            evaluationOptions: getGeofenceOptions(),
+            requestId: `geofence-${Date.now()}`
+        };
+
+        log(`Geofence payload: ${JSON.stringify(payload, null, 2)}`);
+
+        const result = await makeAPIRequest('/api/v1/geofence/evaluate', 'POST', payload);
+
+        displayGeofenceResult(result);
+        
+        if (result.success && result.data) {
+            geofenceState = result.data.status;
+            geofenceStateTimestamp = Date.now();
+        }
+        
+        log(`Geofence status: ${result.data?.status} (confidence: ${result.data?.confidence})`);
+        showStatus('Geofence evaluation complete', 'success');
+
+    } catch (error) {
+        log(`Geofence evaluation failed: ${error.message}`, 'error');
+        showStatus(`Geofence evaluation failed: ${error.message}`, 'error');
+        console.error('Full error details:', error);
+    }
+}
+
+async function testMinimalGeofence() {
+    try {
+        const location = await collectLocationReading();
+        
+        const payload = {
+            location: {
+                latitude: location.latitude,
+                longitude: location.longitude,
+                accuracy: location.accuracy,
+                timestamp: location.timestamp,
+                platform: 'web'
+            },
+            geofence: {
+                center: {
+                    latitude: location.latitude,
+                    longitude: location.longitude
+                },
+                radius: 50
+            }
+        };
+        
+        log(`Testing minimal geofence payload: ${JSON.stringify(payload, null, 2)}`);
+        
+        const result = await makeAPIRequest('/api/v1/geofence/evaluate', 'POST', payload);
+        
+        if (result.success) {
+            log('✅ Minimal geofence test successful!', 'success');
+            console.log('Response:', result);
+        } else {
+            log('❌ Minimal geofence test failed', 'error');
+            console.error('Response:', result);
+        }
+        
+        return result;
+        
+    } catch (error) {
+        log(`Minimal geofence test error: ${error.message}`, 'error');
+        console.error('Full error:', error);
+        throw error;
     }
 }
 
@@ -431,6 +763,195 @@ function displayComparisonResult(result) {
     elements.fusionResult.style.display = 'block';
 }
 
+function displayGeofenceResult(result) {
+    if (!result.success || !result.data) return;
+
+    const data = result.data;
+    const statusIcon = getGeofenceStatusIcon(data.status);
+    const statusClass = `geofence-${data.status.replace('_', '-')}`;
+    
+    const needsVerification = data.verification.needsSecondCheck;
+    const hasTransition = data.stateTransition && data.stateTransition.isTransition;
+    
+    elements.geofenceDisplay.innerHTML = `
+        <div class="geofence-status ${statusClass}">
+            <div class="geofence-header">
+                ${statusIcon} Status: ${data.status.toUpperCase().replace('_', ' ')}
+                <span class="confidence-badge">Confidence: ${Math.round(data.confidence * 100)}%</span>
+            </div>
+            
+            <div class="geofence-details">
+                <div class="detail-row">
+                    <strong>Distance from center:</strong> ${data.distance.toFixed(1)}m
+                </div>
+                <div class="detail-row">
+                    <strong>Distance from boundary:</strong> ${data.distanceFromBoundary > 0 ? '+' : ''}${data.distanceFromBoundary.toFixed(1)}m
+                </div>
+                <div class="detail-row">
+                    <strong>Buffer zone:</strong> ±${data.bufferZone.toFixed(1)}m
+                </div>
+                <div class="detail-row">
+                    <strong>Geofence radius:</strong> ${data.geofenceRadius}m
+                </div>
+            </div>
+            
+            ${needsVerification ? `
+                <div class="verification-alert">
+                    <strong>⚠️ Verification Recommended</strong><br>
+                    ${data.verification.reason}<br>
+                    <small>Suggested delay: ${data.verification.recommendedDelay}ms | Mode: ${data.verification.suggestedAccuracy}</small>
+                </div>
+            ` : ''}
+            
+            ${hasTransition ? `
+                <div class="transition-info">
+                    <strong>🔄 State Transition Detected</strong><br>
+                    From: ${data.stateTransition.from} → To: ${data.stateTransition.to}<br>
+                    ${data.stateTransition.gracePeriodActive ? 
+                        `Grace period active: ${data.stateTransition.gracePeriodRemaining.toFixed(1)}s remaining` : 
+                        'No grace period active'
+                    }<br>
+                    <small>Recommended action: ${data.stateTransition.recommendedAction}</small>
+                </div>
+            ` : ''}
+            
+            <div class="quality-assessment">
+                <strong>📊 Quality Assessment</strong><br>
+                Location quality: ${data.qualityAssessment.locationQuality}<br>
+                Suitable for geofencing: ${data.qualityAssessment.suitableForGeofencing ? '✅' : '❌'}<br>
+                Recommended min radius: ${data.qualityAssessment.recommendedMinRadius}m<br>
+                <small>Factors: ${data.qualityAssessment.confidenceFactors.join(', ')}</small>
+            </div>
+        </div>
+    `;
+    
+    elements.geofenceDisplay.style.display = 'block';
+    elements.geofenceResult.innerHTML = JSON.stringify(result, null, 2);
+    elements.geofenceResult.style.display = 'block';
+}
+
+function displayOptimizationResult(result) {
+    if (!result.success || !result.data) return;
+
+    const data = result.data;
+    const batteryImpactClass = `battery-${data.reasoning.expectedBatteryImpact.replace('_', '-')}`;
+    
+    elements.optimizationDisplay.innerHTML = `
+        <div class="optimization-result">
+            <div class="optimization-header">
+                <strong>🎯 Recommended Mode: ${data.recommendedMode.toUpperCase().replace('_', ' ')}</strong>
+                <span class="${batteryImpactClass}">Battery Impact: ${data.reasoning.expectedBatteryImpact.replace('_', ' ')}</span>
+            </div>
+            
+            <div class="strategy-info">
+                <strong>Strategy:</strong> ${data.selectedStrategy}<br>
+                <strong>Justification:</strong> ${data.reasoning.modeJustification}
+            </div>
+            
+            <div class="key-factors">
+                <strong>🔍 Key Factors:</strong>
+                <ul>
+                    ${data.reasoning.keyFactors.map(factor => `<li>${factor}</li>`).join('')}
+                </ul>
+            </div>
+            
+            <div class="optimization-grid">
+                <div class="optimization-section">
+                    <h4>🔗 Fusion Settings</h4>
+                    <div>Aggressiveness: ${data.optimizations.fusion.aggressiveness}</div>
+                    <div>Kalman Filter: ${data.optimizations.fusion.enableKalman ? '✅' : '❌'}</div>
+                    <div>Weighted Averaging: ${data.optimizations.fusion.enableWeightedAveraging ? '✅' : '❌'}</div>
+                    <div>History Size: ${data.optimizations.fusion.historySize}</div>
+                </div>
+                
+                <div class="optimization-section">
+                    <h4>📍 Location Settings</h4>
+                    <div>Update Frequency: ${data.optimizations.location.updateFrequency}s</div>
+                    <div>Accuracy Threshold: ${data.optimizations.location.accuracyThreshold}m</div>
+                    <div>High Accuracy: ${data.optimizations.location.requestHighAccuracy ? '✅' : '❌'}</div>
+                    <div>Battery Optimized: ${data.optimizations.location.batteryOptimized ? '✅' : '❌'}</div>
+                </div>
+                
+                <div class="optimization-section">
+                    <h4>🎯 Geofence Settings</h4>
+                    <div>Buffer Zone: ${data.optimizations.geofence.bufferZone}m</div>
+                    <div>Multi-Check: ${data.optimizations.geofence.multiCheckEnabled ? '✅' : '❌'}</div>
+                    <div>Grace Period: ${data.optimizations.geofence.gracePeriod}s</div>
+                    <div>Verification Delay: ${data.optimizations.geofence.verificationDelay}ms</div>
+                </div>
+                
+                <div class="optimization-section">
+                    <h4>🏃 Movement Settings</h4>
+                    <div>Anomaly Threshold: ${data.optimizations.movement.anomalyThreshold}</div>
+                    <div>Drift Tolerance: ${data.optimizations.movement.driftTolerance}m</div>
+                    <div>Platform Specific: ${data.optimizations.movement.platformSpecific ? '✅' : '❌'}</div>
+                </div>
+            </div>
+            
+            <div class="expectations">
+                <strong>📊 Expected Results:</strong><br>
+                Accuracy: ~${data.reasoning.expectedAccuracy}m | 
+                Latency: ~${data.reasoning.expectedLatency}ms | 
+                Battery: ${data.reasoning.expectedBatteryImpact.replace('_', ' ')}<br>
+                <small>${data.reasoning.tradeoffAnalysis}</small>
+            </div>
+            
+            <div class="adaptive-recommendations">
+                <strong>🔄 Adaptive Recommendations:</strong><br>
+                Next evaluation: ${data.adaptiveRecommendations.nextEvaluation}s<br>
+                Fallback mode: ${data.adaptiveRecommendations.fallbackMode}<br>
+                <small>Triggers: ${data.adaptiveRecommendations.triggerConditions.join(', ')}</small>
+            </div>
+        </div>
+    `;
+    
+    elements.optimizationDisplay.style.display = 'block';
+    elements.optimizationResult.innerHTML = JSON.stringify(result, null, 2);
+    elements.optimizationResult.style.display = 'block';
+}
+
+function displayContextAnalysis(result) {
+    if (!result.success || !result.data) return;
+
+    const data = result.data;
+    
+    elements.optimizationDisplay.innerHTML = `
+        <div class="context-analysis">
+            <div class="context-header">
+                <strong>📊 Context Analysis Results</strong>
+            </div>
+            
+            <div class="detected-patterns">
+                <h4>🔍 Detected Patterns</h4>
+                <div>Movement: ${data.detectedPatterns.movementPattern}</div>
+                <div>Environment: ${data.detectedPatterns.environment}</div>
+                <div>Battery Optimization Potential: ${Math.round(data.detectedPatterns.batteryOptimizationPotential * 100)}%</div>
+                <div>Accuracy Requirement: ${data.detectedPatterns.accuracyRequirement}</div>
+            </div>
+            
+            ${data.riskFactors.length > 0 ? `
+                <div class="risk-factors">
+                    <h4>⚠️ Risk Factors</h4>
+                    <ul>
+                        ${data.riskFactors.map(risk => `<li>${risk}</li>`).join('')}
+                    </ul>
+                </div>
+            ` : ''}
+            
+            <div class="recommendations">
+                <h4>💡 Recommendations</h4>
+                <ul>
+                    ${data.recommendations.map(rec => `<li>${rec}</li>`).join('')}
+                </ul>
+            </div>
+        </div>
+    `;
+    
+    elements.optimizationDisplay.style.display = 'block';
+    elements.optimizationResult.innerHTML = JSON.stringify(result, null, 2);
+    elements.optimizationResult.style.display = 'block';
+}
+
 function displayBatchResult(batchNum, fromLocation, toLocation, analysis) {
     if (!analysis) return;
 
@@ -519,6 +1040,16 @@ function classifyBatchResult(analysis) {
     return { type: 'normal', reason: `Normal movement: ${analysis.impliedSpeed.toFixed(1)} km/h` };
 }
 
+function getGeofenceStatusIcon(status) {
+    switch (status) {
+        case 'inside': return '✅';
+        case 'outside': return '❌';
+        case 'boundary_zone': return '⚠️';
+        case 'uncertain': return '❓';
+        default: return '❓';
+    }
+}
+
 function startCountdown(seconds) {
     let remaining = seconds;
     elements.countdownValue.textContent = remaining;
@@ -586,7 +1117,6 @@ function clearLogs() {
     elements.logs.innerHTML = '<div class="log-entry"><span class="log-timestamp">[Cleared]</span> Log cleared</div>';
 }
 
-// Event Listeners
 elements.requestPermission.addEventListener('click', async () => {
     if (!navigator.geolocation) {
         showStatus('Geolocation is not supported by this browser', 'error');
@@ -609,13 +1139,16 @@ elements.requestPermission.addEventListener('click', async () => {
         elements.testComparison.disabled = false;
         elements.startFusionTracking.disabled = false;
         elements.startBatchTracking.disabled = false;
+        elements.setGeofenceCenter.disabled = false;
+        elements.testOptimization.disabled = false;
+        elements.analyzeContext.disabled = false;
+        
     } catch (error) {
         log(`Permission error: ${error.message}`);
         showStatus(`Permission error: ${error.message}`, 'error');
     }
 });
 
-// Quality tracking
 elements.testQuality.addEventListener('click', testSignalQuality);
 
 elements.startQualityTracking.addEventListener('click', () => {
@@ -643,7 +1176,6 @@ elements.stopQualityTracking.addEventListener('click', () => {
     elements.stopQualityTracking.disabled = true;
 });
 
-// Fusion tracking
 elements.testFusion.addEventListener('click', testLocationFusion);
 elements.testComparison.addEventListener('click', testFusionComparison);
 
@@ -672,7 +1204,6 @@ elements.stopFusionTracking.addEventListener('click', () => {
     elements.stopFusionTracking.disabled = true;
 });
 
-// Batch tracking
 elements.startBatchTracking.addEventListener('click', () => {
     const intervalSeconds = parseInt(elements.batchInterval.value);
     
@@ -720,6 +1251,42 @@ elements.stopBatchTracking.addEventListener('click', () => {
     elements.batchEnvironment.disabled = false;
     elements.batchInterval.disabled = false;
 });
+
+elements.setGeofenceCenter.addEventListener('click', setGeofenceCenterToCurrent);
+elements.testGeofence.addEventListener('click', testGeofenceStatus);
+
+elements.startGeofenceMonitoring.addEventListener('click', () => {
+    if (!geofenceCenter) {
+        showStatus('Please set geofence center first', 'error');
+        return;
+    }
+    
+    log('Starting geofence monitoring...');
+    showStatus('Starting continuous geofence monitoring...', 'info');
+    
+    geofenceMonitoringInterval = setInterval(() => {
+        testGeofenceStatus();
+    }, 10000);
+    
+    elements.startGeofenceMonitoring.disabled = true;
+    elements.stopGeofenceMonitoring.disabled = false;
+});
+
+elements.stopGeofenceMonitoring.addEventListener('click', () => {
+    if (geofenceMonitoringInterval) {
+        clearInterval(geofenceMonitoringInterval);
+        geofenceMonitoringInterval = null;
+    }
+    
+    log('Geofence monitoring stopped');
+    showStatus('Geofence monitoring stopped', 'info');
+    
+    elements.startGeofenceMonitoring.disabled = false;
+    elements.stopGeofenceMonitoring.disabled = true;
+});
+
+elements.testOptimization.addEventListener('click', testPipelineOptimization);
+elements.analyzeContext.addEventListener('click', analyzeCurrentContext);
 
 document.addEventListener('DOMContentLoaded', () => {
     log('GeoGuardian API Demo ready');
