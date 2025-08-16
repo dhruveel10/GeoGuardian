@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import locationRoutes from './routes/location';
 import movementRoutes from './routes/movementAnalysis';
 import fusionRoutes from './routes/locationFusion';
+import geofenceRoutes from './routes/geofence';
 
 dotenv.config();
 
@@ -25,7 +26,7 @@ app.get('/health', (req, res) => {
     status: 'OK',
     timestamp: new Date().toISOString(),
     service: 'GeoGuardian API',
-    version: '2.1.0',
+    version: '2.2.0',
     uptime: process.uptime()
   });
 });
@@ -33,14 +34,18 @@ app.get('/health', (req, res) => {
 app.get('/api/v1/info', (req, res) => {
   res.json({
     service: 'GeoGuardian Location Processing API',
-    version: '2.1.0',
+    version: '2.2.0',
     endpoints: [
       'POST /api/v1/location/test - Single location quality analysis',
       'POST /api/v1/location/analyze-movement - Movement anomaly detection',
       'GET /api/v1/location/movement-limits - Speed limits for transport modes',
       'POST /api/v1/fusion/fused - Location fusion with filtering',
       'POST /api/v1/fusion/compare - Raw vs fused comparison',
-      'GET /api/v1/fusion/fusion-info - Fusion algorithms info'
+      'GET /api/v1/fusion/fusion-info - Fusion algorithms info',
+      'POST /api/v1/geofence/evaluate - Smart geofence evaluation',
+      'POST /api/v1/geofence/validate - Batch geofence validation',
+      'GET /api/v1/geofence/info - Geofence capabilities and strategies',
+      'GET /api/v1/geofence/zones/calculate - Zone calculation helper'
     ],
     features: [
       'Location quality analysis',
@@ -52,7 +57,23 @@ app.get('/api/v1/info', (req, res) => {
       'Location fusion & correction',
       'Weighted averaging',
       'Kalman filtering',
-      'Real-time comparison'
+      'Real-time comparison',
+      'Smart geofencing',
+      'Multi-zone buffer system',
+      'Grace period management',
+      'Platform-specific optimizations',
+      'Auto-fusion integration',
+      'Movement-aware evaluation'
+    ],
+    newInV2_2: [
+      'Smart geofencing with buffer zones',
+      'Platform-specific geofence optimizations',
+      'Grace period and dwell time logic',
+      'Auto-fusion for geofence evaluation',
+      'Multi-state transitions (approaching/leaving)',
+      'Confidence-based recommendations',
+      'Batch geofence validation',
+      'Zone calculation utilities'
     ],
     documentation: 'https://github.com/dhruveel10/geoguardian',
     status: 'Production'
@@ -62,6 +83,7 @@ app.get('/api/v1/info', (req, res) => {
 app.use('/api/v1/location', locationRoutes);
 app.use('/api/v1/location', movementRoutes);
 app.use('/api/v1/fusion', fusionRoutes);
+app.use('/api/v1/geofence', geofenceRoutes);
 
 app.use((req, res, next) => {
   res.status(404).json({
@@ -75,7 +97,11 @@ app.use((req, res, next) => {
       'GET /api/v1/location/movement-limits - Movement limits',
       'POST /api/v1/fusion/fused - Location fusion',
       'POST /api/v1/fusion/compare - Fusion comparison',
-      'GET /api/v1/fusion/fusion-info - Fusion information'
+      'GET /api/v1/fusion/fusion-info - Fusion information',
+      'POST /api/v1/geofence/evaluate - Geofence evaluation',
+      'POST /api/v1/geofence/validate - Geofence validation',
+      'GET /api/v1/geofence/info - Geofence information',
+      'GET /api/v1/geofence/zones/calculate - Zone calculation'
     ]
   });
 });
@@ -90,14 +116,17 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 GeoGuardian API v2.1 running on http://localhost:${PORT}`);
+  console.log(`🚀 GeoGuardian API v2.2 running on http://localhost:${PORT}`);
   console.log(`📋 Health check: http://localhost:${PORT}/health`);
   console.log(`📖 API info: http://localhost:${PORT}/api/v1/info`);
   console.log(`📍 Location test: http://localhost:${PORT}/api/v1/location/test`);
   console.log(`🏃 Movement analysis: http://localhost:${PORT}/api/v1/location/analyze-movement`);
   console.log(`🔗 Location fusion: http://localhost:${PORT}/api/v1/fusion/fused`);
   console.log(`⚖️  Fusion comparison: http://localhost:${PORT}/api/v1/fusion/compare`);
-  console.log(`🎯 Demo interface: http://localhost:${PORT}`);
+  console.log(`🎯 Geofence evaluation: http://localhost:${PORT}/api/v1/geofence/evaluate`);
+  console.log(`🛡️  Geofence validation: http://localhost:${PORT}/api/v1/geofence/validate`);
+  console.log(`📊 Zone calculator: http://localhost:${PORT}/api/v1/geofence/zones/calculate`);
+  console.log(`🎮 Demo interface: http://localhost:${PORT}`);
 });
 
 export default app;
