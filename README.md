@@ -1603,17 +1603,22 @@ navigator.geolocation.watchPosition(async (position) => {
 
 ---
 
-## 🎬 Demo Videos & Interactive Examples
-
-This repository includes comprehensive demo materials to help you understand and implement GeoGuardian:
-
 ### 📹 Demo Videos
-- **Location Quality Analysis Demo** - Shows real-time GPS quality assessment and recommendations
-<video controls src="WhatsApp Video 2025-08-16 at 17.12.18 (1).mp4" title="Title"></video>
-- **Location Fusion in Action** - Demonstrates how fusion improves GPS accuracy through weighted averaging and Kaplan Filtering
-<video controls src="WhatsApp Video 2025-08-16 at 17.16.42 (1).mp4" title="Title"></video>
-- **Smart Geofencing Journey** - Visual walkthrough of geofence state transitions and intelligent buffering
-<video controls src="Screen Recording 2025-08-16 at 5.02.26 PM.mov" title="Title"></video>
+
+#### Location Quality Analysis Demo
+Shows real-time GPS quality assessment and recommendations
+
+[Demo Video 1](./WhatsApp%20Video%202025-08-16%20at%2017.12.18%20(1).mp4)
+
+#### Location Fusion in Action  
+Demonstrates how fusion improves GPS accuracy through weighted averaging and Kalman Filtering
+
+[Demo Video 2](./WhatsApp%20Video%202025-08-16%20at%2017.16.42%20(1).mp4)
+
+#### Smart Geofencing Journey
+Visual walkthrough of geofence state transitions and intelligent buffering
+
+[Demo Video 3](./Screen%20Recording%202025-08-16%20at%205.02.26%20PM.mov)
 
 ### 🖥️ Interactive Frontend Demos
 - **Live Location Processing Interface** - Real-time location quality analysis with visual feedback
