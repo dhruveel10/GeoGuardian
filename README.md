@@ -1608,17 +1608,17 @@ navigator.geolocation.watchPosition(async (position) => {
 #### Location Quality Analysis Demo
 Shows real-time GPS quality assessment and recommendations
 
-[Demo Video 1](./WhatsApp%20Video%202025-08-16%20at%2017.12.18%20(1).mp4)
+https://github.com/user-attachments/assets/9f2b79b1-5c06-4d2e-ab0d-8b62c0563910
 
 #### Location Fusion in Action  
 Demonstrates how fusion improves GPS accuracy through weighted averaging and Kalman Filtering
 
-[Demo Video 2](./WhatsApp%20Video%202025-08-16%20at%2017.16.42%20(1).mp4)
+https://github.com/user-attachments/assets/55b80458-6245-4d53-967e-430d9ea3470c
 
 #### Smart Geofencing Journey
 Visual walkthrough of geofence state transitions and intelligent buffering
 
-[Demo Video 3](./Screen%20Recording%202025-08-16%20at%205.02.26%20PM.mov)
+https://github.com/user-attachments/assets/518d3f13-f069-4a7c-8a0a-3f068330e0c4
 
 ### 🖥️ Interactive Frontend Demos
 - **Live Location Processing Interface** - Real-time location quality analysis with visual feedback
