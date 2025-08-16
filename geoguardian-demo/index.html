@@ -3,155 +3,187 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoGuardian API Demo</title>
-    <link rel="stylesheet" href="./style.css">
+    <title>GeoGuardian Smart Geofencing Demo</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🛡️ GeoGuardian API Demo</h1>
-            <p>Smart Location Intelligence & Movement Analysis</p>
+            <h1>🛡️ GeoGuardian Smart Geofencing</h1>
+            <p>Intelligent Location Processing with Visual Geofence Analysis</p>
         </div>
 
-        <button class="button" id="requestPermission">📍 Request Location Permission</button>
+        <div class="demo-grid">
+            <div class="map-container">
+                <div class="map-overlay">
+                    <h4 style="margin: 0 0 10px 0;">📊 Live Status</h4>
+                    <div id="liveStatus" class="status-indicator status-info">
+                        Ready to start demo
+                    </div>
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-value" id="currentAccuracy">--</div>
+                            <div class="metric-label">Accuracy (m)</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="currentConfidence">--</div>
+                            <div class="metric-label">Confidence</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="currentPlatform">--</div>
+                            <div class="metric-label">Platform</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="processingTime">--</div>
+                            <div class="metric-label">Process (ms)</div>
+                        </div>
+                    </div>
+                </div>
 
-        <div class="tab-buttons">
-            <button class="tab-button active" onclick="showDemo('quality')">📊 GPS Quality</button>
-            <button class="tab-button" onclick="showDemo('fusion')">🔗 Location Fusion</button>
-            <button class="tab-button" onclick="showDemo('batch')">📈 Batch Tracking</button>
-        </div>
+                <div class="legend">
+                    <h4 style="margin: 0 0 8px 0; font-size: 14px;">Map Legend</h4>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #dc2626;"></div>
+                        <span>Raw GPS Point</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #10b981;"></div>
+                        <span>Processed Point</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #3b82f6;"></div>
+                        <span>Geofence Center</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #10b981; opacity: 0.4;"></div>
+                        <span>✅ Inside Zone</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #3b82f6; opacity: 0.4;"></div>
+                        <span>🔄 Main Geofence</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #fbbf24; opacity: 0.4;"></div>
+                        <span>❓ Uncertainty Zone</span>
+                    </div>
+                </div>
 
-        <div id="status" class="status info" style="display: none;">
-            Ready to test location services
-        </div>
-
-        <!-- GPS Quality Demo -->
-        <div id="qualityDemo" class="demo-section active">
-            <div class="api-section">
-                <h3>📊 GPS Signal Quality Analysis</h3>
-                <p>Test the <code>/api/v1/location/test</code> endpoint to analyze GPS signal quality and get recommendations.</p>
-                
-                <button class="button secondary" id="testQuality" disabled>🔍 Test Signal Quality</button>
-                <button class="button" id="startQualityTracking" disabled>📡 Start Quality Monitoring</button>
-                <button class="button danger" id="stopQualityTracking" disabled>⏹️ Stop Monitoring</button>
-
-                <div id="qualityDisplay" style="display: none;"></div>
-                <div id="qualityResult" class="result-display"></div>
+                <div id="map"></div>
             </div>
-        </div>
 
-        <!-- Location Fusion Demo -->
-        <div id="fusionDemo" class="demo-section">
-            <div class="api-section">
-                <h3>🔗 Location Fusion & Correction</h3>
-                <p>Test the <code>/api/v1/fusion/fused</code> and <code>/api/v1/fusion/compare</code> endpoints to improve GPS accuracy using weighted averaging and Kalman filtering.</p>
-
-                <div class="settings">
-                    <div class="setting-group">
-                        <label for="fusionWeightedAveraging">
-                            <input type="checkbox" id="fusionWeightedAveraging" checked> Weighted Averaging
-                        </label>
-                        <small>Combines multiple readings with accuracy weighting</small>
+            <div class="control-panel">
+                <div class="section">
+                    <h3>🎯 Geofence Setup</h3>
+                    <div class="form-group">
+                        <label for="geofenceName">Geofence Name:</label>
+                        <input type="text" id="geofenceName" value="Test Building" placeholder="Enter geofence name">
                     </div>
-                    <div class="setting-group">
-                        <label for="fusionKalmanFilter">
-                            <input type="checkbox" id="fusionKalmanFilter"> Kalman Filter
-                        </label>
-                        <small>Predictive smoothing based on movement patterns</small>
+                    <div class="form-group">
+                        <label for="geofenceRadius">Radius (meters):</label>
+                        <input type="number" id="geofenceRadius" value="100" min="10" max="1000">
                     </div>
-                    <div class="setting-group">
-                        <label for="fusionAggressiveness">Aggressiveness:</label>
-                        <select id="fusionAggressiveness">
+                    <div class="form-group">
+                        <label for="bufferStrategy">Buffer Strategy:</label>
+                        <select id="bufferStrategy">
                             <option value="conservative">Conservative</option>
                             <option value="moderate" selected>Moderate</option>
                             <option value="aggressive">Aggressive</option>
                         </select>
-                        <small>How much correction to apply</small>
                     </div>
+                    <button class="button" id="createGeofence" disabled>📍 Click Map to Create Geofence</button>
                 </div>
 
-                <button class="button secondary" id="testFusion" disabled>🔍 Test Single Fusion</button>
-                <button class="button" id="testComparison" disabled>⚖️ Compare Raw vs Fused</button>
-                <button class="button" id="startFusionTracking" disabled>📡 Start Fusion Monitoring</button>
-                <button class="button danger" id="stopFusionTracking" disabled>⏹️ Stop Monitoring</button>
-
-                <div id="fusionDisplay" style="display: none;"></div>
-                <div id="fusionResult" class="result-display"></div>
-            </div>
-        </div>
-
-        <!-- Batch Tracking Demo -->
-        <div id="batchDemo" class="demo-section">
-            <div class="api-section">
-                <h3>📈 Batch Movement Analysis</h3>
-                <p>Continuous movement analysis with 10-second intervals to demonstrate real-world GPS filtering.</p>
-
-                <div class="settings">
-                    <div class="setting-group">
-                        <label for="batchTransportMode">Transport Mode:</label>
-                        <select id="batchTransportMode">
-                            <option value="stationary" selected>Stationary</option>
-                            <option value="walking">Walking</option>
-                            <option value="cycling">Cycling</option>
-                            <option value="driving">Driving</option>
+                <div class="section">
+                    <h3>⚙️ Processing Options</h3>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="enableFusion" checked>
+                        <label for="enableFusion">Enable Location Fusion</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="enableMovementAnalysis" checked>
+                        <label for="enableMovementAnalysis">Movement Analysis</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="enableKalman">
+                        <label for="enableKalman">Kalman Filtering</label>
+                    </div>
+                    <div class="form-group">
+                        <label for="simulateDevice">Simulate Device:</label>
+                        <select id="simulateDevice">
+                            <option value="auto">Auto-detect</option>
+                            <option value="ios">iOS Device</option>
+                            <option value="android">Android Device</option>
+                            <option value="web">Web Browser</option>
                         </select>
                     </div>
-                    <div class="setting-group">
-                        <label for="batchEnvironment">Environment:</label>
-                        <select id="batchEnvironment">
-                            <option value="indoor" selected>Indoor</option>
-                            <option value="urban">Urban</option>
-                            <option value="outdoor">Outdoor</option>
-                            <option value="rural">Rural</option>
-                        </select>
-                    </div>
-                    <div class="setting-group">
-                        <label for="batchInterval">Interval (seconds):</label>
-                        <input type="number" id="batchInterval" value="10" min="5" max="30">
+                </div>
+
+                <div class="section">
+                    <h3>🚀 Demo Controls</h3>
+                    <button class="button" id="requestLocation">📍 Request Location Access</button>
+                    <button class="button success" id="startDemo" disabled>▶️ Start Smart Tracking</button>
+                    <button class="button danger" id="stopDemo" disabled>⏹️ Stop Demo</button>
+                    <button class="button" id="clearMap">🗑️ Clear Map</button>
+                </div>
+
+                <div class="section">
+                    <h3>🔄 Processing Pipeline</h3>
+                    <div class="processing-pipeline">
+                        <div class="pipeline-step" id="step1">
+                            <span>1️⃣</span>
+                            <span>Collect GPS Reading</span>
+                        </div>
+                        <div class="pipeline-step" id="step2">
+                            <span>2️⃣</span>
+                            <span>Quality Analysis</span>
+                        </div>
+                        <div class="pipeline-step" id="step3">
+                            <span>3️⃣</span>
+                            <span>Location Fusion</span>
+                        </div>
+                        <div class="pipeline-step" id="step4">
+                            <span>4️⃣</span>
+                            <span>Movement Analysis</span>
+                        </div>
+                        <div class="pipeline-step" id="step5">
+                            <span>5️⃣</span>
+                            <span>Geofence Evaluation</span>
+                        </div>
                     </div>
                 </div>
 
-                <button class="button" id="startBatchTracking" disabled>🏃 Start Batch Tracking</button>
-                <button class="button danger" id="stopBatchTracking" disabled>⏹️ Stop Tracking</button>
-
-                <div id="countdown" class="countdown">
-                    Next reading in <span id="countdownValue">10</span> seconds...
-                </div>
-
-                <div class="stats" id="batchStats" style="display: none;">
-                    <div class="stat-card">
-                        <div class="stat-value" id="totalBatches">0</div>
-                        <div class="stat-label">Total Batches</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="normalBatches">0</div>
-                        <div class="stat-label">Normal</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="anomalyBatches">0</div>
-                        <div class="stat-label">Anomalies</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value" id="totalDistance">0m</div>
-                        <div class="stat-label">Total Distance</div>
+                <div class="section">
+                    <h3>📊 Raw vs Processed</h3>
+                    <div class="comparison-panels">
+                        <div class="comparison-panel panel-raw">
+                            <strong>📍 Raw GPS</strong>
+                            <div id="rawData">No data yet</div>
+                        </div>
+                        <div class="comparison-panel panel-processed">
+                            <strong>✨ Processed</strong>
+                            <div id="processedData">No data yet</div>
+                        </div>
                     </div>
                 </div>
 
-                <div id="batchContainer" class="batch-container" style="display: none;"></div>
+                <div class="section">
+                    <h3>🎯 Geofence Results</h3>
+                    <div class="geofence-results" id="geofenceResults">
+                        No geofences created yet
+                    </div>
+                </div>
+
+                <div class="logs" id="logs">
+                    <div class="log-entry">
+                        <span class="log-timestamp">[Ready]</span> GeoGuardian Smart Geofencing Demo initialized
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="container">
-        <h3>📝 Activity Log</h3>
-        <div id="logs" class="logs">
-            <div class="log-entry">
-                <span class="log-timestamp">[Ready]</span> GeoGuardian API Demo initialized
-            </div>
-        </div>
-        <button class="button small" onclick="clearLogs()" style="margin-top: 12px; background: #6b7280;">Clear Logs</button>
-    </div>
-
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
