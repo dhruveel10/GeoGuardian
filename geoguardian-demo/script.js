@@ -1,7 +1,5 @@
-// Configuration
 const API_BASE = 'https://geoguardian-pa0d.onrender.com/api/v1';
 
-// Global variables
 let map;
 let currentLocationMarker;
 let fusedLocationMarker;
@@ -13,11 +11,9 @@ let isTracking = false;
 let rawLocationCircle;
 let fusedLocationCircle;
 
-// Initialize map
 function initMap() {
     map = L.map('map').setView([37.7749, -122.4194], 15);
 
-    // Use a generic/abstract tile layer instead of real streets
     L.tileLayer('data:image/svg+xml;base64,' + btoa(`
                 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256">
                     <defs>
@@ -33,7 +29,6 @@ function initMap() {
         attribution: 'Demo Map - Not Real Location Data'
     }).addTo(map);
 
-    // Add click handler for creating geofences
     map.on('click', function (e) {
         if (document.getElementById('createGeofence').textContent.includes('Click Map')) {
             createGeofenceAtLocation(e.latlng);
@@ -43,7 +38,6 @@ function initMap() {
     log('Map initialized and ready');
 }
 
-// Logging function
 function log(message, type = 'info') {
     const timestamp = new Date().toLocaleTimeString();
     const logEntry = document.createElement('div');
@@ -53,27 +47,23 @@ function log(message, type = 'info') {
     document.getElementById('logs').scrollTop = document.getElementById('logs').scrollHeight;
 }
 
-// Update status indicator
 function updateStatus(message, type = 'info') {
     const statusEl = document.getElementById('liveStatus');
     statusEl.textContent = message;
     statusEl.className = `status-indicator status-${type}`;
 }
 
-// Update pipeline step
 function updatePipelineStep(stepId, status) {
     const step = document.getElementById(stepId);
     step.className = `pipeline-step ${status}`;
 }
 
-// Reset pipeline
 function resetPipeline() {
     ['step1', 'step2', 'step3', 'step4', 'step5'].forEach(id => {
         document.getElementById(id).className = 'pipeline-step';
     });
 }
 
-// Create geofence at clicked location
 function createGeofenceAtLocation(latlng) {
     const name = document.getElementById('geofenceName').value || 'Geofence';
     const radius = parseInt(document.getElementById('geofenceRadius').value);
@@ -100,12 +90,10 @@ function createGeofenceAtLocation(latlng) {
     }, 2000);
 }
 
-// Draw geofence on map
 function drawGeofence(geofence) {
     const center = [geofence.center.latitude, geofence.center.longitude];
     const radius = geofence.radius;
 
-    // Calculate buffer zones
     const strategy = document.getElementById('bufferStrategy').value;
     const bufferMultipliers = {
         conservative: 1.2,
@@ -113,11 +101,10 @@ function drawGeofence(geofence) {
         aggressive: 2.0
     };
 
-    const buffer = Math.max(20, 15 * bufferMultipliers[strategy]); // Simulated buffer
+    const buffer = Math.max(20, 15 * bufferMultipliers[strategy]);
     const innerRadius = Math.max(0, radius - buffer);
     const outerRadius = radius + buffer;
 
-    // Draw outer zone (uncertainty) - with visible border and label
     const outerCircle = L.circle(center, {
         radius: outerRadius,
         fillColor: '#fbbf24',
@@ -127,7 +114,6 @@ function drawGeofence(geofence) {
         fillOpacity: 0.15
     }).addTo(map);
 
-    // Add radius label for outer zone
     const outerLabel = L.marker([center[0] + 0.0005, center[1]], {
         icon: L.divIcon({
             className: 'radius-label',
@@ -137,7 +123,6 @@ function drawGeofence(geofence) {
         })
     }).addTo(map);
 
-    // Draw main geofence - with visible border and label
     const mainCircle = L.circle(center, {
         radius: radius,
         fillColor: '#3b82f6',
@@ -147,7 +132,6 @@ function drawGeofence(geofence) {
         fillOpacity: 0.2
     }).addTo(map);
 
-    // Add radius label for main geofence
     const mainLabel = L.marker([center[0] - 0.0003, center[1]], {
         icon: L.divIcon({
             className: 'radius-label',
@@ -157,8 +141,7 @@ function drawGeofence(geofence) {
         })
     }).addTo(map);
 
-    // Draw inner zone (definitely inside) - with visible border and label
-    if (innerRadius > 10) { // Only show if meaningful size
+    if (innerRadius > 10) {
         const innerCircle = L.circle(center, {
             radius: innerRadius,
             fillColor: '#10b981',
@@ -168,7 +151,6 @@ function drawGeofence(geofence) {
             fillOpacity: 0.25
         }).addTo(map);
 
-        // Add radius label for inner zone
         const innerLabel = L.marker([center[0] + 0.0003, center[1]], {
             icon: L.divIcon({
                 className: 'radius-label',
@@ -179,7 +161,6 @@ function drawGeofence(geofence) {
         }).addTo(map);
     }
 
-    // Add center marker with name label
     const centerMarker = L.marker(center, {
         icon: L.divIcon({
             className: 'geofence-center',
@@ -189,7 +170,6 @@ function drawGeofence(geofence) {
         })
     }).addTo(map);
 
-    // Add geofence name label
     const nameLabel = L.marker([center[0] - 0.0008, center[1]], {
         icon: L.divIcon({
             className: 'geofence-name',
@@ -199,14 +179,12 @@ function drawGeofence(geofence) {
         })
     }).addTo(map);
 
-    // Store references for potential cleanup
     geofence._mapLayers = [outerCircle, mainCircle, centerMarker, outerLabel, mainLabel, nameLabel];
     if (innerRadius > 10) {
         // innerCircle and innerLabel would be added here if we stored them
     }
 }
 
-// Detect platform
 function detectPlatform() {
     const simulateDevice = document.getElementById('simulateDevice').value;
     if (simulateDevice !== 'auto') return simulateDevice;
@@ -217,7 +195,6 @@ function detectPlatform() {
     return 'web';
 }
 
-// Get current location
 async function getCurrentLocation() {
     return new Promise((resolve, reject) => {
         if (!navigator.geolocation) {
@@ -251,7 +228,6 @@ async function getCurrentLocation() {
     });
 }
 
-// Make API request
 async function makeAPIRequest(endpoint, method = 'GET', data = null) {
     const url = `${API_BASE}${endpoint}`;
 
@@ -275,7 +251,6 @@ async function makeAPIRequest(endpoint, method = 'GET', data = null) {
     return await response.json();
 }
 
-// Clean data for API (remove circular references)
 function cleanLocationData(location) {
     return {
         latitude: location.latitude,
@@ -304,7 +279,6 @@ function cleanGeofenceData(geofence) {
     };
 }
 
-// Process location through API pipeline
 async function processLocationPipeline(rawLocation) {
     let processedLocation = { ...rawLocation };
     let results = {
@@ -316,10 +290,8 @@ async function processLocationPipeline(rawLocation) {
     };
 
     try {
-        // Clean the location data for API calls
         const cleanRawLocation = cleanLocationData(rawLocation);
 
-        // Step 1: Quality Analysis
         updatePipelineStep('step1', 'active');
         updateStatus('Analyzing GPS quality...', 'info');
 
@@ -332,7 +304,6 @@ async function processLocationPipeline(rawLocation) {
         updatePipelineStep('step1', 'complete');
         log(`Quality: ${qualityResult.data.quality.grade} (${qualityResult.data.quality.score}/100)`);
 
-        // Step 2: Location Fusion (if enabled and history available)
         if (document.getElementById('enableFusion').checked && locationHistory.length > 0) {
             updatePipelineStep('step2', 'active');
             updateStatus('Applying location fusion...', 'info');
@@ -363,7 +334,6 @@ async function processLocationPipeline(rawLocation) {
             log('Fusion skipped (disabled or no history)');
         }
 
-        // Step 3: Movement Analysis (if enabled and previous location available)
         if (document.getElementById('enableMovementAnalysis').checked && locationHistory.length > 0) {
             updatePipelineStep('step3', 'active');
             updateStatus('Analyzing movement...', 'info');
@@ -389,7 +359,6 @@ async function processLocationPipeline(rawLocation) {
             log('Movement analysis skipped (disabled or no history)');
         }
 
-        // Step 4: Geofence Evaluation (if geofences exist)
         if (geofences.length > 0) {
             updatePipelineStep('step4', 'active');
             updateStatus('Evaluating geofences...', 'info');
@@ -404,7 +373,7 @@ async function processLocationPipeline(rawLocation) {
                 locationHistory: cleanHistory,
                 previousStates: geofenceStates,
                 options: {
-                    enableAutoFusion: false, // Already did fusion
+                    enableAutoFusion: false, 
                     bufferStrategy: document.getElementById('bufferStrategy').value,
                     requireHighAccuracy: false
                 },
@@ -438,7 +407,6 @@ async function processLocationPipeline(rawLocation) {
     return { processedLocation, results };
 }
 
-// Update geofence results display
 function updateGeofenceResults(evaluations) {
     const container = document.getElementById('geofenceResults');
     container.innerHTML = '';
@@ -470,9 +438,7 @@ function updateGeofenceResults(evaluations) {
     });
 }
 
-// Update comparison panels
 function updateComparisonPanels(rawLocation, processedLocation, results) {
-    // Raw data panel
     document.getElementById('rawData').innerHTML = `
                 <div>Lat: ${rawLocation.latitude.toFixed(6)}</div>
                 <div>Lng: ${rawLocation.longitude.toFixed(6)}</div>
@@ -481,7 +447,6 @@ function updateComparisonPanels(rawLocation, processedLocation, results) {
                 ${results.quality ? `<div>Quality: ${results.quality.quality.grade} (${results.quality.quality.score})</div>` : ''}
             `;
 
-    // Processed data panel
     const accuracyImprovement = rawLocation.accuracy - processedLocation.accuracy;
     const improvementText = accuracyImprovement > 0 ?
         `↑ ${accuracyImprovement.toFixed(1)}m better` :
@@ -499,7 +464,6 @@ function updateComparisonPanels(rawLocation, processedLocation, results) {
             `;
 }
 
-// Update metrics
 function updateMetrics(location, results) {
     document.getElementById('currentAccuracy').textContent = `±${Math.round(location.accuracy)}`;
     document.getElementById('currentPlatform').textContent = location.platform.toUpperCase();
@@ -510,18 +474,15 @@ function updateMetrics(location, results) {
     }
 }
 
-// Update map markers
 function updateMapMarkers(rawLocation, processedLocation) {
     const rawLatLng = [rawLocation.latitude, rawLocation.longitude];
     const processedLatLng = [processedLocation.latitude, processedLocation.longitude];
 
-    // Remove existing markers
     if (currentLocationMarker) map.removeLayer(currentLocationMarker);
     if (fusedLocationMarker) map.removeLayer(fusedLocationMarker);
     if (rawLocationCircle) map.removeLayer(rawLocationCircle);
     if (fusedLocationCircle) map.removeLayer(fusedLocationCircle);
 
-    // Add raw location marker and accuracy circle
     rawLocationCircle = L.circle(rawLatLng, {
         radius: rawLocation.accuracy,
         fillColor: '#dc2626',
@@ -540,11 +501,10 @@ function updateMapMarkers(rawLocation, processedLocation) {
         })
     }).addTo(map).bindPopup(`Raw GPS<br>±${Math.round(rawLocation.accuracy)}m accuracy`);
 
-    // Add processed location marker if different
     const distance = calculateDistance(rawLocation.latitude, rawLocation.longitude,
         processedLocation.latitude, processedLocation.longitude);
 
-    if (distance > 1) { // Only show if moved more than 1 meter
+    if (distance > 1) {
         fusedLocationCircle = L.circle(processedLatLng, {
             radius: processedLocation.accuracy,
             fillColor: '#10b981',
@@ -563,7 +523,6 @@ function updateMapMarkers(rawLocation, processedLocation) {
             })
         }).addTo(map).bindPopup(`Processed Location<br>±${Math.round(processedLocation.accuracy)}m accuracy<br>Moved ${distance.toFixed(1)}m from raw`);
 
-        // Draw line between raw and processed
         L.polyline([rawLatLng, processedLatLng], {
             color: '#6b7280',
             weight: 2,
@@ -571,14 +530,11 @@ function updateMapMarkers(rawLocation, processedLocation) {
             dashArray: '5, 5'
         }).addTo(map);
     }
-
-    // Center map on current location
     map.setView(processedLatLng, map.getZoom());
 }
 
-// Calculate distance between two points
 function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371000; // Earth's radius in meters
+    const R = 6371000; 
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
@@ -588,7 +544,6 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
-// Main tracking function
 async function performTracking() {
     try {
         resetPipeline();
@@ -599,12 +554,10 @@ async function performTracking() {
 
         const { processedLocation, results } = await processLocationPipeline(rawLocation);
 
-        // Update UI
         updateMapMarkers(rawLocation, processedLocation);
         updateComparisonPanels(rawLocation, processedLocation, results);
         updateMetrics(processedLocation, results);
 
-        // Add to history
         locationHistory.push(processedLocation);
         if (locationHistory.length > 10) {
             locationHistory = locationHistory.slice(-10);
@@ -619,7 +572,6 @@ async function performTracking() {
     }
 }
 
-// Event Listeners
 document.getElementById('requestLocation').addEventListener('click', async () => {
     try {
         updateStatus('Requesting location permission...', 'info');
@@ -644,10 +596,8 @@ document.getElementById('startDemo').addEventListener('click', () => {
     log('Starting smart tracking demo...');
     updateStatus('Demo started - tracking every 5 seconds', 'success');
 
-    // Immediate first reading
     performTracking();
 
-    // Set up interval
     trackingInterval = setInterval(performTracking, 5000);
 
     document.getElementById('startDemo').disabled = true;
@@ -673,14 +623,12 @@ document.getElementById('stopDemo').addEventListener('click', () => {
 });
 
 document.getElementById('clearMap').addEventListener('click', () => {
-    // Clear all layers except the base map
     map.eachLayer(layer => {
         if (layer !== map._layers[Object.keys(map._layers)[0]]) {
             map.removeLayer(layer);
         }
     });
 
-    // Reset data
     geofences = [];
     locationHistory = [];
     geofenceStates = [];
@@ -689,7 +637,6 @@ document.getElementById('clearMap').addEventListener('click', () => {
     rawLocationCircle = null;
     fusedLocationCircle = null;
 
-    // Reset UI
     document.getElementById('geofenceResults').innerHTML = 'No geofences created yet';
     document.getElementById('rawData').innerHTML = 'No data yet';
     document.getElementById('processedData').innerHTML = 'No data yet';
@@ -702,7 +649,6 @@ document.getElementById('clearMap').addEventListener('click', () => {
     updateStatus('Map cleared - ready for new demo', 'info');
 });
 
-// Initialize when page loads
 document.addEventListener('DOMContentLoaded', () => {
     initMap();
     log('Smart Geofencing Demo ready');

@@ -56,3 +56,4 @@ temp/
 *.pem
 *.key
 config/local.json
+geoguardian-api/test-ai-geoguardian.js
