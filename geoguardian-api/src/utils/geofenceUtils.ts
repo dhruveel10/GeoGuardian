@@ -9,8 +9,11 @@ import {
   GeofenceValidationResult,
   GeofenceEvaluationResult
 } from '../types/geofence';
+import { LocationAI } from './locationAI';
 
 export class GeofenceUtils {
+  private static ai = LocationAI.getInstance();
+
   private static readonly PLATFORM_SETTINGS: GeofencePlatformSettings = {
     ios: {
       bufferMultiplier: 0.8,
@@ -43,6 +46,148 @@ export class GeofenceUtils {
     moderate: { multiplier: 1.5, maxRatio: 0.4, minBuffer: 20 },
     aggressive: { multiplier: 2.0, maxRatio: 0.5, minBuffer: 25 }
   };
+
+  static async optimizeGeofenceWithAI(
+    geofence: Geofence,
+    environment: string,
+    issues?: string[]
+  ): Promise<Geofence> {
+    try {
+      const optimization = await this.ai.optimizeGeofence(geofence, environment, issues);
+      
+      return {
+        ...geofence,
+        radius: optimization.recommendedRadius,
+        metadata: {
+          ...geofence.metadata,
+          aiOptimized: true,
+          aiReasoning: optimization.reasoning,
+          aiConfidence: optimization.confidence,
+          recommendedBufferStrategy: optimization.bufferStrategy
+        }
+      };
+    } catch (error) {
+      console.warn('AI geofence optimization failed:', error);
+      return geofence;
+    }
+  }
+  
+  static async evaluateGeofenceWithAI(
+    geofence: Geofence,
+    location: LocationReading,
+    options: GeofenceEvaluationOptions,
+    previousStates?: GeofenceState[]
+  ): Promise<GeofenceEvaluationResult> {
+    const standardResult = this.evaluateGeofenceStandard(geofence, location, options, previousStates);
+    
+    if (standardResult.confidence < 0.6) {
+      try {
+        const environment = this.inferEnvironment(location, geofence);
+        const issues = this.identifyGeofenceIssues(standardResult, location);
+        
+        const optimizedGeofence = await this.optimizeGeofenceWithAI(geofence, environment, issues);
+        
+        if (optimizedGeofence.radius !== geofence.radius) {
+          const newResult = this.evaluateGeofenceStandard(optimizedGeofence, location, options, previousStates);
+          
+          if (newResult.confidence > standardResult.confidence) {
+            newResult.debugInfo.platformAnalysis.platformSpecificFactors.push(
+              `AI optimization improved confidence from ${standardResult.confidence.toFixed(2)} to ${newResult.confidence.toFixed(2)}`
+            );
+            return newResult;
+          }
+        }
+      } catch (error) {
+        console.warn('AI geofence evaluation failed:', error);
+      }
+    }
+    
+    return standardResult;
+  }
+  
+  private static evaluateGeofenceStandard(
+    geofence: Geofence,
+    location: LocationReading,
+    options: GeofenceEvaluationOptions,
+    previousStates?: GeofenceState[]
+  ): GeofenceEvaluationResult {
+    const previousState = previousStates?.find(s => s.geofenceId === geofence.id);
+    
+    const distance = this.calculateDistance(
+      location.latitude,
+      location.longitude,
+      geofence.center.latitude,
+      geofence.center.longitude
+    );
+  
+    const zones = this.calculateGeofenceZones(geofence, location, options);
+    const status = this.determineGeofenceStatus(distance, zones, previousState);
+    const confidence = this.calculateConfidence(distance, zones, location, options);
+    const dwellTime = previousState ? previousState.dwellTimeInside : 0;
+    const triggered = this.determineTriggeredEvent(status, previousState, geofence, dwellTime);
+    const recommendation = this.generateRecommendation(status, confidence, location, zones, options);
+  
+    return {
+      geofenceId: geofence.id,
+      status: status as any,
+      confidence,
+      triggered: triggered as any,
+      recommendation: recommendation as any,
+      debugInfo: {
+        distanceToCenter: distance,
+        geofenceRadius: geofence.radius,
+        zones,
+        locationQuality: {
+          accuracy: location.accuracy,
+          platform: location.platform || 'unknown',
+          qualityGrade: 'good',
+          fusionApplied: false,
+          movementAnalyzed: false
+        },
+        stateHistory: {
+          previousStatus: previousState?.status,
+          consecutiveOutsideCount: previousState?.consecutiveOutsideCount || 0,
+          dwellTimeInside: dwellTime
+        },
+        platformAnalysis: {
+          baseBuffer: zones.bufferSize,
+          platformMultiplier: 1.0,
+          finalBuffer: zones.bufferSize,
+          confidenceAdjustment: 1.0,
+          platformSpecificFactors: []
+        },
+        nextActions: {
+          highAccuracyThreshold: zones.bufferSize * 0.5,
+          alternativeApproaches: []
+        }
+      }
+    };
+  }
+  
+  private static inferEnvironment(location: LocationReading, geofence: Geofence): string {
+    if (location.accuracy > 100) return 'indoor';
+    if (location.accuracy > 50) return 'urban';
+    if (geofence.radius > 500) return 'outdoor';
+    return 'urban';
+  }
+  
+  private static identifyGeofenceIssues(result: GeofenceEvaluationResult, location: LocationReading): string[] {
+    const issues: string[] = [];
+    
+    if (result.confidence < 0.5) {
+      issues.push('Low confidence geofence evaluation');
+    }
+    
+    if (location.accuracy > result.debugInfo.geofenceRadius * 0.5) {
+      issues.push('GPS accuracy poor relative to geofence size');
+    }
+    
+    if (result.status === 'uncertain') {
+      issues.push('Location in uncertainty zone');
+    }
+    
+    return issues;
+  }
 
   static calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
     const R = 6371000;

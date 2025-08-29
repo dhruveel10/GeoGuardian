@@ -7,6 +7,7 @@ import locationRoutes from './routes/location';
 import movementRoutes from './routes/movementAnalysis';
 import fusionRoutes from './routes/locationFusion';
 import geofenceRoutes from './routes/geofence';
+import aiRoutes from './routes/aiAnalysis';
 
 dotenv.config();
 
@@ -34,7 +35,7 @@ app.get('/health', (req, res) => {
 app.get('/api/v1/info', (req, res) => {
   res.json({
     service: 'GeoGuardian Location Processing API',
-    version: '2.2.0',
+    version: '2.3.0',
     endpoints: [
       'POST /api/v1/location/test - Single location quality analysis',
       'POST /api/v1/location/analyze-movement - Movement anomaly detection',
@@ -45,7 +46,10 @@ app.get('/api/v1/info', (req, res) => {
       'POST /api/v1/geofence/evaluate - Smart geofence evaluation',
       'POST /api/v1/geofence/validate - Batch geofence validation',
       'GET /api/v1/geofence/info - Geofence capabilities and strategies',
-      'GET /api/v1/geofence/zones/calculate - Zone calculation helper'
+      'GET /api/v1/geofence/zones/calculate - Zone calculation helper',
+      'POST /api/v1/ai/validate-location - AI location plausibility validation',
+      'POST /api/v1/ai/explain-anomaly - AI movement anomaly explanation',
+      'POST /api/v1/ai/optimize-geofence - AI geofence optimization'
     ],
     features: [
       'Location quality analysis',
@@ -63,17 +67,17 @@ app.get('/api/v1/info', (req, res) => {
       'Grace period management',
       'Platform-specific optimizations',
       'Auto-fusion integration',
-      'Movement-aware evaluation'
+      'Movement-aware evaluation',
+      'AI-powered location validation',
+      'AI anomaly explanation',
+      'AI geofence optimization'
     ],
-    newInV2_2: [
-      'Smart geofencing with buffer zones',
-      'Platform-specific geofence optimizations',
-      'Grace period and dwell time logic',
-      'Auto-fusion for geofence evaluation',
-      'Multi-state transitions (approaching/leaving)',
-      'Confidence-based recommendations',
-      'Batch geofence validation',
-      'Zone calculation utilities'
+    newInV2_3: [
+      'AI-powered location plausibility validation',
+      'Natural language anomaly explanations',
+      'AI-driven geofence optimization',
+      'Context-aware location correction',
+      'Intelligent fusion decision making'
     ],
     documentation: 'https://github.com/dhruveel10/geoguardian',
     status: 'Production'
@@ -84,6 +88,7 @@ app.use('/api/v1/location', locationRoutes);
 app.use('/api/v1/location', movementRoutes);
 app.use('/api/v1/fusion', fusionRoutes);
 app.use('/api/v1/geofence', geofenceRoutes);
+app.use('/api/v1/ai', aiRoutes);
 
 app.use((req, res, next) => {
   res.status(404).json({
@@ -101,7 +106,10 @@ app.use((req, res, next) => {
       'POST /api/v1/geofence/evaluate - Geofence evaluation',
       'POST /api/v1/geofence/validate - Geofence validation',
       'GET /api/v1/geofence/info - Geofence information',
-      'GET /api/v1/geofence/zones/calculate - Zone calculation'
+      'GET /api/v1/geofence/zones/calculate - Zone calculation',
+      'POST /api/v1/ai/validate-location - AI location validation',
+      'POST /api/v1/ai/explain-anomaly - AI anomaly explanation',
+      'POST /api/v1/ai/optimize-geofence - AI geofence optimization'
     ]
   });
 });

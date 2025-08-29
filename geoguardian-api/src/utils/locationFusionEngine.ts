@@ -1,5 +1,6 @@
 import { LocationReading } from '../types/location';
 import { FusionOptions, FusionResult } from '../types/locationFusion';
+import { LocationAI } from './locationAI';
 
 export class LocationFusionEngine {
   private static readonly PLATFORM_ACCURACY_FACTORS = {
@@ -8,6 +9,8 @@ export class LocationFusionEngine {
     web: { multiplier: 0.9, bias: 0 },
     unknown: { multiplier: 1.0, bias: 0 }
   };
+
+  private static ai = LocationAI.getInstance();
 
   private static readonly PLATFORM_FUSION_SETTINGS = {
     ios: {
@@ -74,105 +77,6 @@ export class LocationFusionEngine {
     outdoor: { minRealistic: 3, typical: 10 },
     unknown: { minRealistic: 10, typical: 25 }
   };
-
-  static fuseLocation(
-    currentLocation: LocationReading,
-    locationHistory: LocationReading[] = [],
-    options: FusionOptions
-  ): FusionResult {
-    const startTime = Date.now();
-    const appliedCorrections: string[] = [];
-    const metadata: FusionResult['fusionMetadata'] = {
-      algorithmUsed: 'smart_conditional',
-      locationsUsed: 1
-    };
-
-    const platform = currentLocation.platform || 'unknown';
-    const aggressiveness = options.aggressiveness || 'moderate';
-    const settings = this.PLATFORM_FUSION_SETTINGS[platform][aggressiveness];
-    
-    const validHistory = this.filterValidHistory(locationHistory, currentLocation, options.maxHistoryAge || 300000, settings.maxHistoryPoints);
-    
-    const shouldAttemptFusion = this.shouldAttemptFusion(currentLocation, validHistory, settings, platform);
-    if (!shouldAttemptFusion.should) {
-      appliedCorrections.push(shouldAttemptFusion.reason);
-      return {
-        originalLocation: currentLocation,
-        fusedLocation: currentLocation,
-        appliedCorrections,
-        confidenceImprovement: 0,
-        fusionMetadata: { ...metadata, algorithmUsed: 'smart_bailout' }
-      };
-    }
-
-    let bestLocation = { ...currentLocation };
-    let bestConfidence = this.calculateLocationConfidence(currentLocation);
-    let confidenceImprovement = 0;
-
-    if (options.enableWeightedAveraging && validHistory.length > 0) {
-      const weightedResult = this.applyPlatformSpecificWeightedAveraging(
-        [...validHistory, currentLocation], 
-        platform,
-        aggressiveness
-      );
-      
-      const fusedConfidence = this.calculateLocationConfidence(weightedResult.location);
-      if (fusedConfidence > bestConfidence * settings.fusionThreshold) {
-        bestLocation = weightedResult.location;
-        bestConfidence = fusedConfidence;
-        appliedCorrections.push(`Platform-optimized weighted averaging (${validHistory.length + 1} locations)`);
-        confidenceImprovement += weightedResult.confidenceGain;
-        metadata.algorithmUsed = 'platform_weighted_averaging';
-        metadata.locationsUsed = validHistory.length + 1;
-        metadata.weightDistribution = weightedResult.weights;
-      } else {
-        appliedCorrections.push(`Weighted averaging rejected (confidence: ${fusedConfidence.toFixed(3)} < threshold: ${(bestConfidence * settings.fusionThreshold).toFixed(3)})`);
-      }
-    }
-
-    if (options.enableKalmanFilter && validHistory.length > 1) {
-      const kalmanResult = this.applyPlatformSpecificKalmanFilter(
-        bestLocation, 
-        validHistory, 
-        platform,
-        aggressiveness
-      );
-      
-      const kalmanConfidence = this.calculateLocationConfidence(kalmanResult.location);
-      if (kalmanConfidence > bestConfidence * settings.fusionThreshold) {
-        bestLocation = kalmanResult.location;
-        bestConfidence = kalmanConfidence;
-        appliedCorrections.push(`Platform-optimized Kalman filter`);
-        confidenceImprovement += kalmanResult.confidenceGain;
-        metadata.algorithmUsed = metadata.algorithmUsed.includes('weighted') ? 
-          'platform_weighted_adaptive_kalman' : 'platform_adaptive_kalman';
-        metadata.kalmanGain = kalmanResult.gain;
-        metadata.estimatedVelocity = kalmanResult.velocity;
-      } else {
-        appliedCorrections.push(`Kalman filter rejected (confidence: ${kalmanConfidence.toFixed(3)} < threshold: ${(bestConfidence * settings.fusionThreshold).toFixed(3)})`);
-      }
-    }
-
-    const originalConfidence = this.calculateLocationConfidence(currentLocation);
-    const finalConfidence = this.calculateLocationConfidence(bestLocation);
-    
-    if (finalConfidence < originalConfidence * 0.9) {
-      appliedCorrections.length = 0;
-      appliedCorrections.push('All fusion rejected - would decrease confidence significantly');
-      bestLocation = currentLocation;
-      metadata.algorithmUsed = 'confidence_fallback';
-    }
-
-    const processingTime = Date.now() - startTime;
-    
-    return {
-      originalLocation: currentLocation,
-      fusedLocation: bestLocation,
-      appliedCorrections,
-      confidenceImprovement: Math.round(confidenceImprovement * 100) / 100,
-      fusionMetadata: metadata
-    };
-  }
 
   private static shouldAttemptFusion(
     current: LocationReading, 
@@ -505,27 +409,6 @@ export class LocationFusionEngine {
     };
   }
 
-  private static applyPlatformCorrections(
-    location: LocationReading,
-    appliedCorrections: string[]
-  ): LocationReading {
-    const platform = location.platform || 'unknown';
-    const correction = this.PLATFORM_ACCURACY_FACTORS[platform];
-    
-    if (correction && correction.multiplier !== 1.0 && location.accuracy > 10) {
-      const correctedAccuracy = Math.max(3, location.accuracy * correction.multiplier + correction.bias);
-      
-      if (correctedAccuracy < location.accuracy) {
-        return {
-          ...location,
-          accuracy: correctedAccuracy
-        };
-      }
-    }
-    
-    return location;
-  }
-
   static calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
     const R = 6371000;
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -578,5 +461,197 @@ export class LocationFusionEngine {
     }
 
     return { isValid: errors.length === 0, errors };
+  }
+
+  static async fuseLocation(
+    currentLocation: LocationReading,
+    locationHistory: LocationReading[] = [],
+    options: FusionOptions
+  ): Promise<FusionResult> {
+    const startTime = Date.now();
+    const appliedCorrections: string[] = [];
+    const metadata: FusionResult['fusionMetadata'] = {
+      algorithmUsed: 'smart_conditional',
+      locationsUsed: 1
+    };
+  
+    const platform = currentLocation.platform || 'unknown';
+    const aggressiveness = options.aggressiveness || 'moderate';
+    const settings = this.PLATFORM_FUSION_SETTINGS[platform][aggressiveness];
+    
+    const validHistory = this.filterValidHistory(locationHistory, currentLocation, options.maxHistoryAge || 300000, settings.maxHistoryPoints);
+    
+    let aiValidation;
+    try {
+      aiValidation = await this.ai.validateLocationPlausibility({
+        current: currentLocation,
+        history: validHistory,
+        context: this.inferEnvironmentContext(currentLocation, validHistory)
+      });
+      
+      if (!aiValidation.plausible && aiValidation.confidence > 0.7) {
+        appliedCorrections.push(`AI rejected location: ${aiValidation.reasoning}`);
+        
+        if (aiValidation.recommendedAction === 'apply_correction' && aiValidation.suggestedLocation) {
+          return {
+            originalLocation: currentLocation,
+            fusedLocation: aiValidation.suggestedLocation,
+            appliedCorrections: [`AI correction applied: ${aiValidation.reasoning}`],
+            confidenceImprovement: 0.3,
+            fusionMetadata: { ...metadata, algorithmUsed: 'ai_correction' }
+          };
+        }
+        
+        return {
+          originalLocation: currentLocation,
+          fusedLocation: currentLocation,
+          appliedCorrections,
+          confidenceImprovement: 0,
+          fusionMetadata: { ...metadata, algorithmUsed: 'ai_rejection' }
+        };
+      }
+      
+      if (aiValidation.reasoning) {
+        appliedCorrections.push(`AI validation: ${aiValidation.reasoning}`);
+      }
+    } catch (error) {
+      appliedCorrections.push('AI validation unavailable, using traditional methods');
+    }
+  
+    const shouldAttemptFusion = this.shouldAttemptFusion(currentLocation, validHistory, settings, platform);
+    if (!shouldAttemptFusion.should) {
+      appliedCorrections.push(shouldAttemptFusion.reason);
+      return {
+        originalLocation: currentLocation,
+        fusedLocation: currentLocation,
+        appliedCorrections,
+        confidenceImprovement: 0,
+        fusionMetadata: { ...metadata, algorithmUsed: 'smart_bailout' }
+      };
+    }
+  
+    let bestLocation = { ...currentLocation };
+    let bestConfidence = this.calculateLocationConfidence(currentLocation);
+    let confidenceImprovement = 0;
+  
+    if (options.enableWeightedAveraging && validHistory.length > 0) {
+      const weightedResult = this.applyPlatformSpecificWeightedAveraging(
+        [...validHistory, currentLocation], 
+        platform,
+        aggressiveness
+      );
+      
+      const fusedConfidence = this.calculateLocationConfidence(weightedResult.location);
+      if (fusedConfidence > bestConfidence * settings.fusionThreshold) {
+        bestLocation = weightedResult.location;
+        bestConfidence = fusedConfidence;
+        appliedCorrections.push(`Platform-optimized weighted averaging (${validHistory.length + 1} locations)`);
+        confidenceImprovement += weightedResult.confidenceGain;
+        metadata.algorithmUsed = 'platform_weighted_averaging';
+        metadata.locationsUsed = validHistory.length + 1;
+        metadata.weightDistribution = weightedResult.weights;
+      } else {
+        appliedCorrections.push(`Weighted averaging rejected (confidence: ${fusedConfidence.toFixed(3)} < threshold: ${(bestConfidence * settings.fusionThreshold).toFixed(3)})`);
+      }
+    }
+  
+    if (options.enableKalmanFilter && validHistory.length > 1) {
+      const kalmanResult = this.applyPlatformSpecificKalmanFilter(
+        bestLocation, 
+        validHistory, 
+        platform,
+        aggressiveness
+      );
+      
+      const kalmanConfidence = this.calculateLocationConfidence(kalmanResult.location);
+      if (kalmanConfidence > bestConfidence * settings.fusionThreshold) {
+        bestLocation = kalmanResult.location;
+        bestConfidence = kalmanConfidence;
+        appliedCorrections.push(`Platform-optimized Kalman filter`);
+        confidenceImprovement += kalmanResult.confidenceGain;
+        metadata.algorithmUsed = metadata.algorithmUsed.includes('weighted') ? 
+          'platform_weighted_adaptive_kalman' : 'platform_adaptive_kalman';
+        metadata.kalmanGain = kalmanResult.gain;
+        metadata.estimatedVelocity = kalmanResult.velocity;
+      } else {
+        appliedCorrections.push(`Kalman filter rejected (confidence: ${kalmanConfidence.toFixed(3)} < threshold: ${(bestConfidence * settings.fusionThreshold).toFixed(3)})`);
+      }
+    }
+  
+    if (aiValidation && bestLocation !== currentLocation) {
+      try {
+        const postFusionValidation = await this.ai.validateLocationPlausibility({
+          current: bestLocation,
+          history: validHistory,
+          fusionResult: bestLocation,
+          context: this.inferEnvironmentContext(currentLocation, validHistory)
+        });
+        
+        if (!postFusionValidation.plausible && postFusionValidation.confidence > 0.6) {
+          appliedCorrections.push(`AI rejected fusion result: ${postFusionValidation.reasoning}`);
+          bestLocation = currentLocation;
+          metadata.algorithmUsed = 'ai_fusion_rejection';
+        } else if (postFusionValidation.suggestedLocation && postFusionValidation.confidence > 0.8) {
+          bestLocation = postFusionValidation.suggestedLocation;
+          appliedCorrections.push(`AI correction applied to fusion result`);
+          confidenceImprovement += 0.1;
+          metadata.algorithmUsed = 'ai_enhanced_fusion';
+        }
+      } catch (error) {
+        appliedCorrections.push('Post-fusion AI validation failed');
+      }
+    }
+  
+    const originalConfidence = this.calculateLocationConfidence(currentLocation);
+    const finalConfidence = this.calculateLocationConfidence(bestLocation);
+    
+    if (finalConfidence < originalConfidence * 0.9) {
+      appliedCorrections.length = 0;
+      appliedCorrections.push('All fusion rejected - would decrease confidence significantly');
+      bestLocation = currentLocation;
+      metadata.algorithmUsed = 'confidence_fallback';
+    }
+  
+    const processingTime = Date.now() - startTime;
+    metadata.processingTime = processingTime;
+    
+    return {
+      originalLocation: currentLocation,
+      fusedLocation: bestLocation,
+      appliedCorrections,
+      confidenceImprovement: Math.round(confidenceImprovement * 100) / 100,
+      fusionMetadata: metadata
+    };
+  }
+  
+  private static inferEnvironmentContext(current: LocationReading, history: LocationReading[]): string {
+    if (current.accuracy > 100) return 'indoor';
+    if (current.accuracy > 50) return 'urban';
+    if (history.length > 0) {
+      const avgSpeed = this.calculateAverageSpeed(history.concat(current));
+      if (avgSpeed > 60) return 'highway';
+      if (avgSpeed > 20) return 'urban';
+      if (avgSpeed < 3) return 'stationary';
+    }
+    return 'outdoor';
+  }
+  
+  private static calculateAverageSpeed(locations: LocationReading[]): number {
+    if (locations.length < 2) return 0;
+    
+    let totalDistance = 0;
+    let totalTime = 0;
+    
+    for (let i = 1; i < locations.length; i++) {
+      const distance = this.calculateDistance(
+        locations[i-1].latitude, locations[i-1].longitude,
+        locations[i].latitude, locations[i].longitude
+      );
+      const time = (locations[i].timestamp - locations[i-1].timestamp) / 1000;
+      totalDistance += distance;
+      totalTime += time;
+    }
+    
+    return totalTime > 0 ? (totalDistance / totalTime) * 3.6 : 0;
   }
 }
