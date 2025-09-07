@@ -12,7 +12,7 @@ import {
 
 const router = express.Router();
 
-router.post('/fused', (req, res) => {
+router.post('/fused', async (req, res) => {
   const startTime = Date.now();
   
   try {
@@ -58,7 +58,7 @@ router.post('/fused', (req, res) => {
       ...fusionOptions
     };
 
-    const fusionResult = LocationFusionEngine.fuseLocation(
+    const fusionResult = await LocationFusionEngine.fuseLocation(
       sanitizedCurrent,
       sanitizedHistory,
       options
@@ -114,7 +114,7 @@ router.post('/fused', (req, res) => {
   }
 });
 
-router.post('/compare', (req, res) => {
+router.post('/compare', async (req, res) => {
   const startTime = Date.now();
   
   try {
@@ -151,7 +151,7 @@ router.post('/compare', (req, res) => {
       ...fusionOptions
     };
 
-    const fusionResult = LocationFusionEngine.fuseLocation(
+    const fusionResult = await LocationFusionEngine.fuseLocation(
       sanitizedCurrent,
       sanitizedHistory,
       options

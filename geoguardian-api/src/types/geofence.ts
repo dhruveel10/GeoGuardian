@@ -11,6 +11,10 @@ export interface Geofence {
     priority?: 'high' | 'medium' | 'low';
     minDwellTime?: number;
     exitGracePeriod?: number;
+    aiOptimized?: boolean;
+    aiReasoning?: string;
+    aiConfidence?: number;
+    recommendedBufferStrategy?: 'conservative' | 'moderate' | 'aggressive';
   };
 }
 

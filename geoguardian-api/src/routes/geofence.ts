@@ -14,7 +14,7 @@ import {
 
 const router = express.Router();
 
-router.post('/evaluate', (req, res) => {
+router.post('/evaluate', async (req, res) => {
   const startTime = Date.now();
   
   try {
@@ -60,7 +60,7 @@ router.post('/evaluate', (req, res) => {
     if (evaluationOptions.enableAutoFusion && locationHistory.length > 0) {
       const sanitizedHistory = locationHistory.map(loc => LocationValidator.sanitize(loc));
       
-      const fusionResult = LocationFusionEngine.fuseLocation(
+      const fusionResult = await LocationFusionEngine.fuseLocation(
         processedLocation,
         sanitizedHistory,
         {
@@ -79,7 +79,7 @@ router.post('/evaluate', (req, res) => {
 
     if (locationHistory.length > 0) {
       const lastLocation = locationHistory[locationHistory.length - 1];
-      const movementAnalysis = MovementAnomalyAnalyzer.analyzeMovement({
+      const movementAnalysis = await MovementAnomalyAnalyzer.analyzeMovementWithAI({
         previousLocation: lastLocation,
         currentLocation: processedLocation
       });
@@ -99,99 +99,25 @@ router.post('/evaluate', (req, res) => {
     const updatedStates: GeofenceState[] = [];
 
     for (const geofence of geofences) {
-      const previousState = previousStates.find(s => s.geofenceId === geofence.id);
-      
-      const distance = GeofenceUtils.calculateDistance(
-        processedLocation.latitude,
-        processedLocation.longitude,
-        geofence.center.latitude,
-        geofence.center.longitude
+      const evaluation = await GeofenceUtils.evaluateGeofenceWithAI(
+        geofence,
+        processedLocation,
+        evaluationOptions,
+        previousStates
       );
 
-      const zones = GeofenceUtils.calculateGeofenceZones(geofence, processedLocation, evaluationOptions);
-      
-      const status = GeofenceUtils.determineGeofenceStatus(distance, zones, previousState);
-      
-      const confidence = GeofenceUtils.calculateConfidence(
-        distance, 
-        zones, 
-        processedLocation, 
-        evaluationOptions
-      );
-
-      const dwellTime = previousState ? previousState.dwellTimeInside : 0;
-      const triggered = GeofenceUtils.determineTriggeredEvent(status, previousState, geofence, dwellTime);
-      
-      const recommendation = GeofenceUtils.generateRecommendation(
-        status, 
-        confidence, 
-        processedLocation, 
-        zones, 
-        evaluationOptions
-      );
-
-      const platformSettings = (GeofenceUtils as any).PLATFORM_SETTINGS[processedLocation.platform || 'unknown'];
-      const bufferSettings = (GeofenceUtils as any).BUFFER_SETTINGS[evaluationOptions.bufferStrategy || 'moderate'];
-      
-      const baseBuffer = Math.max(bufferSettings.minBuffer, processedLocation.accuracy * bufferSettings.multiplier);
-      const platformBuffer = baseBuffer * platformSettings.bufferMultiplier;
-      
-      const platformSpecificFactors: string[] = [];
-      if (zones.platformAdjusted) {
-        platformSpecificFactors.push(`${processedLocation.platform} platform buffer adjustment applied`);
-      }
-      if (confidence !== confidence * platformSettings.confidenceBoost) {
-        platformSpecificFactors.push(`${processedLocation.platform} confidence adjustment: ${platformSettings.confidenceBoost}x`);
-      }
-
-      const evaluation: GeofenceEvaluationResult = {
-        geofenceId: geofence.id,
-        status: status as any,
-        confidence: Math.round(confidence * 1000) / 1000,
-        triggered: triggered as any,
-        recommendation: recommendation as any,
-        debugInfo: {
-          distanceToCenter: Math.round(distance * 100) / 100,
-          geofenceRadius: geofence.radius,
-          zones,
-          locationQuality: {
-            accuracy: processedLocation.accuracy,
-            platform: processedLocation.platform || 'unknown',
-            qualityGrade: locationQuality.grade,
-            fusionApplied,
-            movementAnalyzed
-          },
-          stateHistory: {
-            previousStatus: previousState?.status,
-            consecutiveOutsideCount: previousState?.consecutiveOutsideCount || 0,
-            dwellTimeInside: dwellTime,
-            lastTransitionTime: previousState?.lastTransitionTime
-          },
-          platformAnalysis: {
-            baseBuffer: Math.round(baseBuffer * 100) / 100,
-            platformMultiplier: platformSettings.bufferMultiplier,
-            finalBuffer: Math.round(zones.bufferSize * 100) / 100,
-            confidenceAdjustment: platformSettings.confidenceBoost,
-            platformSpecificFactors
-          },
-          nextActions: {
-            suggestedWaitTime: recommendation === 'wait' ? 5 : undefined,
-            highAccuracyThreshold: zones.bufferSize * 0.5,
-            alternativeApproaches: confidence < 0.5 ? 
-              ['Enable location fusion', 'Request high accuracy GPS', 'Wait for better signal'] : 
-              []
-          }
-        }
-      };
+      evaluation.debugInfo.locationQuality.fusionApplied = fusionApplied;
+      evaluation.debugInfo.locationQuality.movementAnalyzed = movementAnalyzed;
+      evaluation.debugInfo.locationQuality.qualityGrade = locationQuality.grade;
 
       evaluations.push(evaluation);
 
       const updatedState = GeofenceUtils.updateGeofenceState(
         geofence.id,
-        status,
-        previousState,
-        triggered === 'entry',
-        triggered === 'exit'
+        evaluation.status,
+        previousStates.find(s => s.geofenceId === geofence.id),
+        evaluation.triggered === 'entry',
+        evaluation.triggered === 'exit'
       );
       updatedStates.push(updatedState);
     }

@@ -1,7 +1,9 @@
 import { LocationReading } from '../types/location';
 import { MovementAnalysisRequest, MovementAnalysisResult } from '../types/movementAnalysis';
+import { LocationAI } from './locationAI';
 
 export class MovementAnomalyAnalyzer {
+  private static ai = LocationAI.getInstance();
   private static readonly DEFAULT_MAX_SPEEDS: Record<string, number> = {
     walking: 15,
     cycling: 40,
@@ -22,6 +24,35 @@ export class MovementAnomalyAnalyzer {
 
   private static readonly EARTH_RADIUS = 6371;
 
+  static async analyzeMovementWithAI(request: MovementAnalysisRequest): Promise<MovementAnalysisResult> {
+    const basicResult = this.analyzeMovement(request);
+    
+    if (!basicResult.accepted || basicResult.confidence < 0.7) {
+      try {
+        const aiExplanation = await this.ai.explainMovementAnomaly(basicResult, [request.previousLocation]);
+        
+        return {
+          ...basicResult,
+          reason: aiExplanation.explanation,
+          recommendation: aiExplanation.recommendations[0] || basicResult.recommendation,
+          contextualInsights: {
+            ...basicResult.contextualInsights,
+            environmentalFactors: [...basicResult.contextualInsights.environmentalFactors, ...aiExplanation.likelyCauses],
+            recommendations: aiExplanation.recommendations
+          },
+          metadata: {
+            ...basicResult.metadata,
+            riskLevel: aiExplanation.severity === 'high' ? 'high' : aiExplanation.severity === 'low' ? 'low' : 'medium'
+          }
+        };
+      } catch (error) {
+        console.warn('AI explanation failed:', error);
+      }
+    }
+    
+    return basicResult;
+  }
+  
   static analyzeMovement(request: MovementAnalysisRequest): MovementAnalysisResult {
     const { previousLocation, currentLocation, contextHints, deviceInfo } = request;
     

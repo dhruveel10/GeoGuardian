@@ -3,180 +3,383 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoGuardian Smart Geofencing Demo</title>
+    <title>GeoGuardian AI-Enhanced Demo</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🛡️ GeoGuardian Smart Geofencing</h1>
-            <p>Intelligent Location Processing with Visual Geofence Analysis</p>
+            <h1>🛡️ GeoGuardian AI-Enhanced Geofencing</h1>
+            <p>See how AI dramatically improves location processing accuracy and reduces false positives</p>
         </div>
 
-        <div class="demo-grid">
-            <div class="map-container">
-                <div class="map-overlay">
-                    <h4 style="margin: 0 0 10px 0;">📊 Live Status</h4>
-                    <div id="liveStatus" class="status-indicator status-info">
-                        Ready to start demo
-                    </div>
-                    <div class="metrics-grid">
-                        <div class="metric-card">
-                            <div class="metric-value" id="currentAccuracy">--</div>
-                            <div class="metric-label">Accuracy (m)</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-value" id="currentConfidence">--</div>
-                            <div class="metric-label">Confidence</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-value" id="currentPlatform">--</div>
-                            <div class="metric-label">Platform</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-value" id="processingTime">--</div>
-                            <div class="metric-label">Process (ms)</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="legend">
-                    <h4 style="margin: 0 0 8px 0; font-size: 14px;">Map Legend</h4>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #dc2626;"></div>
-                        <span>Raw GPS Point</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #10b981;"></div>
-                        <span>Processed Point</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #3b82f6;"></div>
-                        <span>Geofence Center</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #10b981; opacity: 0.4;"></div>
-                        <span>✅ Inside Zone</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #3b82f6; opacity: 0.4;"></div>
-                        <span>🔄 Main Geofence</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #fbbf24; opacity: 0.4;"></div>
-                        <span>❓ Uncertainty Zone</span>
-                    </div>
-                </div>
-
-                <div id="map"></div>
+        <div class="demo-tabs">
+            <div class="tab-buttons">
+                <button class="tab-btn active" data-tab="live-demo">🎯 Live Demo</button>
+                <button class="tab-btn" data-tab="ai-comparison">🤖 Before vs After AI</button>
+                <button class="tab-btn" data-tab="analytics">📊 Performance Analytics</button>
             </div>
+        </div>
 
-            <div class="control-panel">
-                <div class="section">
-                    <h3>🎯 Geofence Setup</h3>
-                    <div class="form-group">
-                        <label for="geofenceName">Geofence Name:</label>
-                        <input type="text" id="geofenceName" value="Test Building" placeholder="Enter geofence name">
+        <div id="live-demo" class="tab-content active">
+            <div class="demo-grid">
+                <div class="map-container">
+                    <div class="map-overlay">
+                        <div class="status-header">
+                            <h4>📊 Live Processing Status</h4>
+                            <div class="ai-indicator">
+                                <span class="ai-badge">🤖 AI Enhanced</span>
+                            </div>
+                        </div>
+                        <div id="liveStatus" class="status-indicator status-info">
+                            Ready to start demo
+                        </div>
+                        <div class="metrics-grid">
+                            <div class="metric-card">
+                                <div class="metric-value" id="currentAccuracy">--</div>
+                                <div class="metric-label">Accuracy (m)</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" id="aiConfidence">--</div>
+                                <div class="metric-label">AI Confidence</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" id="accuracyGain">--</div>
+                                <div class="metric-label">AI Improvement</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" id="processingTime">--</div>
+                                <div class="metric-label">Process (ms)</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="geofenceRadius">Radius (meters):</label>
-                        <input type="number" id="geofenceRadius" value="100" min="10" max="1000">
+
+                    <div class="legend">
+                        <h4>Map Legend</h4>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #dc2626;"></div>
+                            <span>Raw GPS (Before AI)</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #10b981;"></div>
+                            <span>AI Enhanced (After AI)</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #3b82f6;"></div>
+                            <span>Geofence Center</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #10b981; opacity: 0.4;"></div>
+                            <span>✅ Inside Zone</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #fbbf24; opacity: 0.4;"></div>
+                            <span>❓ Uncertainty Zone</span>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="bufferStrategy">Buffer Strategy:</label>
-                        <select id="bufferStrategy">
-                            <option value="conservative">Conservative</option>
-                            <option value="moderate" selected>Moderate</option>
-                            <option value="aggressive">Aggressive</option>
-                        </select>
-                    </div>
-                    <button class="button" id="createGeofence" disabled>📍 Click Map to Create Geofence</button>
+
+                    <div id="map"></div>
                 </div>
 
-                <div class="section">
-                    <h3>⚙️ Processing Options</h3>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="enableFusion" checked>
-                        <label for="enableFusion">Enable Location Fusion</label>
+                <div class="control-panel">
+                    <div class="section">
+                        <h3>🎯 Geofence Setup</h3>
+                        <div class="form-group">
+                            <label for="geofenceName">Geofence Name:</label>
+                            <input type="text" id="geofenceName" value="Test Building" placeholder="Enter geofence name">
+                        </div>
+                        <div class="form-group">
+                            <label for="geofenceRadius">Radius (meters):</label>
+                            <input type="number" id="geofenceRadius" value="100" min="10" max="1000">
+                        </div>
+                        <button class="button" id="createGeofence" disabled>📍 Click Map to Create Geofence</button>
                     </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="enableMovementAnalysis" checked>
-                        <label for="enableMovementAnalysis">Movement Analysis</label>
+
+                    <div class="section">
+                        <h3>🚀 Demo Controls</h3>
+                        <button class="button" id="requestLocation">📍 Request Location Access</button>
+                        <button class="button success" id="startDemo" disabled>▶️ Start AI Processing</button>
+                        <button class="button danger" id="stopDemo" disabled>⏹️ Stop Demo</button>
+                        <button class="button" id="clearMap">🗑️ Clear Map</button>
                     </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="enableKalman">
-                        <label for="enableKalman">Kalman Filtering</label>
+
+                    <div class="section">
+                        <h3>🤖 AI Processing Pipeline</h3>
+                        <div class="processing-pipeline">
+                            <div class="pipeline-step" id="step1">
+                                <span>1️⃣</span>
+                                <span>GPS Collection</span>
+                            </div>
+                            <div class="pipeline-step" id="step2">
+                                <span>2️⃣</span>
+                                <span>AI Quality Analysis</span>
+                            </div>
+                            <div class="pipeline-step" id="step3">
+                                <span>3️⃣</span>
+                                <span>Smart Location Fusion</span>
+                            </div>
+                            <div class="pipeline-step" id="step4">
+                                <span>4️⃣</span>
+                                <span>AI Movement Validation</span>
+                            </div>
+                            <div class="pipeline-step" id="step5">
+                                <span>5️⃣</span>
+                                <span>Intelligent Geofencing</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="simulateDevice">Simulate Device:</label>
-                        <select id="simulateDevice">
-                            <option value="auto">Auto-detect</option>
-                            <option value="ios">iOS Device</option>
-                            <option value="android">Android Device</option>
-                            <option value="web">Web Browser</option>
-                        </select>
+
+                    <div class="section">
+                        <h3>📊 Before vs After AI</h3>
+                        <div class="comparison-panels">
+                            <div class="comparison-panel panel-raw">
+                                <strong>📍 Before AI</strong>
+                                <div id="rawData">No data yet</div>
+                            </div>
+                            <div class="comparison-panel panel-processed">
+                                <strong>🤖 After AI</strong>
+                                <div id="processedData">No data yet</div>
+                            </div>
+                        </div>
+                        <div class="improvement-summary" id="improvementSummary">
+                            Start demo to see AI improvements
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h3>🎯 Geofence Results</h3>
+                        <div class="geofence-results" id="geofenceResults">
+                            No geofences created yet
+                        </div>
+                    </div>
+
+                    <div class="logs" id="logs">
+                        <div class="log-entry">
+                            <span class="log-timestamp">[Ready]</span> GeoGuardian AI-Enhanced Demo initialized
+                        </div>
                     </div>
                 </div>
+            </div>
+        </div>
 
-                <div class="section">
-                    <h3>🚀 Demo Controls</h3>
-                    <button class="button" id="requestLocation">📍 Request Location Access</button>
-                    <button class="button success" id="startDemo" disabled>▶️ Start Smart Tracking</button>
-                    <button class="button danger" id="stopDemo" disabled>⏹️ Stop Demo</button>
-                    <button class="button" id="clearMap">🗑️ Clear Map</button>
+        <div id="ai-comparison" class="tab-content">
+            <div class="comparison-dashboard">
+                <div class="comparison-header">
+                    <h2>🤖 Traditional vs AI-Enhanced Processing</h2>
+                    <p>Real-time comparison showing exactly how AI improves location accuracy</p>
                 </div>
-
-                <div class="section">
-                    <h3>🔄 Processing Pipeline</h3>
-                    <div class="processing-pipeline">
-                        <div class="pipeline-step" id="step1">
-                            <span>1️⃣</span>
-                            <span>Collect GPS Reading</span>
+                
+                <div class="comparison-grid">
+                    <div class="comparison-section">
+                        <div class="section-header">
+                            <h3>📍 Traditional Processing</h3>
+                            <div class="process-indicator traditional">Basic GPS</div>
                         </div>
-                        <div class="pipeline-step" id="step2">
-                            <span>2️⃣</span>
-                            <span>Quality Analysis</span>
+                        <div class="traditional-results">
+                            <div class="result-item">
+                                <div class="result-label">Raw GPS Accuracy</div>
+                                <div class="result-value" id="traditionalAccuracy">-- meters</div>
+                            </div>
+                            <div class="result-item">
+                                <div class="result-label">False Positives</div>
+                                <div class="result-value" id="traditionalFalsePositives">--%</div>
+                            </div>
+                            <div class="result-item">
+                                <div class="result-label">Movement Anomalies</div>
+                                <div class="result-value" id="traditionalAnomalies">--</div>
+                            </div>
+                            <div class="result-item">
+                                <div class="result-label">Processing Time</div>
+                                <div class="result-value" id="traditionalProcessingTime">-- ms</div>
+                            </div>
                         </div>
-                        <div class="pipeline-step" id="step3">
-                            <span>3️⃣</span>
-                            <span>Location Fusion</span>
+                        
+                        <div class="method-description">
+                            <h4>How Traditional Processing Works:</h4>
+                            <ul>
+                                <li>Uses raw GPS coordinates directly</li>
+                                <li>Basic accuracy filtering only</li>
+                                <li>Simple distance-based geofencing</li>
+                                <li>No movement pattern analysis</li>
+                                <li>High false positive rates</li>
+                            </ul>
                         </div>
-                        <div class="pipeline-step" id="step4">
-                            <span>4️⃣</span>
-                            <span>Movement Analysis</span>
+                    </div>
+                    
+                    <div class="comparison-section">
+                        <div class="section-header">
+                            <h3>🤖 AI-Enhanced Processing</h3>
+                            <div class="process-indicator ai-enhanced">AI Powered</div>
                         </div>
-                        <div class="pipeline-step" id="step5">
-                            <span>5️⃣</span>
-                            <span>Geofence Evaluation</span>
+                        <div class="ai-results">
+                            <div class="result-item">
+                                <div class="result-label">AI-Enhanced Accuracy</div>
+                                <div class="result-value improved" id="aiAccuracy">-- meters</div>
+                            </div>
+                            <div class="result-item">
+                                <div class="result-label">False Positives</div>
+                                <div class="result-value improved" id="aiFalsePositives">--%</div>
+                            </div>
+                            <div class="result-item">
+                                <div class="result-label">Movement Anomalies</div>
+                                <div class="result-value improved" id="aiAnomalies">--</div>
+                            </div>
+                            <div class="result-item">
+                                <div class="result-label">Processing Time</div>
+                                <div class="result-value" id="aiProcessingTime">-- ms</div>
+                            </div>
+                        </div>
+                        
+                        <div class="method-description">
+                            <h4>How AI Processing Works:</h4>
+                            <ul>
+                                <li>AI validates location plausibility</li>
+                                <li>Smart fusion of multiple readings</li>
+                                <li>Movement pattern recognition</li>
+                                <li>Context-aware geofence evaluation</li>
+                                <li>Dramatically reduced false positives</li>
+                            </ul>
                         </div>
                     </div>
                 </div>
-
-                <div class="section">
-                    <h3>📊 Raw vs Processed</h3>
-                    <div class="comparison-panels">
-                        <div class="comparison-panel panel-raw">
-                            <strong>📍 Raw GPS</strong>
-                            <div id="rawData">No data yet</div>
+                
+                <div class="improvement-metrics">
+                    <h3>📈 AI Improvement Summary</h3>
+                    <div class="metrics-grid">
+                        <div class="improvement-card accuracy">
+                            <div class="improvement-icon">🎯</div>
+                            <div class="improvement-content">
+                                <div class="improvement-title">Accuracy Improvement</div>
+                                <div class="improvement-value" id="accuracyImprovement">+0%</div>
+                                <div class="improvement-desc">Better location precision</div>
+                            </div>
                         </div>
-                        <div class="comparison-panel panel-processed">
-                            <strong>✨ Processed</strong>
-                            <div id="processedData">No data yet</div>
+                        
+                        <div class="improvement-card false-positive">
+                            <div class="improvement-icon">🛡️</div>
+                            <div class="improvement-content">
+                                <div class="improvement-title">False Positive Reduction</div>
+                                <div class="improvement-value" id="falsePositiveReduction">-0%</div>
+                                <div class="improvement-desc">Fewer incorrect alerts</div>
+                            </div>
+                        </div>
+                        
+                        <div class="improvement-card reliability">
+                            <div class="improvement-icon">⚡</div>
+                            <div class="improvement-content">
+                                <div class="improvement-title">Reliability Increase</div>
+                                <div class="improvement-value" id="reliabilityIncrease">+0%</div>
+                                <div class="improvement-desc">More consistent results</div>
+                            </div>
+                        </div>
+                        
+                        <div class="improvement-card efficiency">
+                            <div class="improvement-icon">🚀</div>
+                            <div class="improvement-content">
+                                <div class="improvement-title">Processing Efficiency</div>
+                                <div class="improvement-value" id="efficiencyGain">+0%</div>
+                                <div class="improvement-desc">Smarter resource usage</div>
+                            </div>
                         </div>
                     </div>
                 </div>
-
-                <div class="section">
-                    <h3>🎯 Geofence Results</h3>
-                    <div class="geofence-results" id="geofenceResults">
-                        No geofences created yet
+                
+                <div class="live-comparison" id="liveComparison">
+                    <h3>🔄 Live Processing Comparison</h3>
+                    <div class="comparison-timeline" id="comparisonTimeline">
+                        <div class="timeline-message">Start the demo to see live comparisons</div>
                     </div>
                 </div>
-
-                <div class="logs" id="logs">
-                    <div class="log-entry">
-                        <span class="log-timestamp">[Ready]</span> GeoGuardian Smart Geofencing Demo initialized
+            </div>
+        </div>
+        
+        <div id="analytics" class="tab-content">
+            <div class="analytics-dashboard">
+                <div class="analytics-header">
+                    <h2>📊 Performance Analytics & Insights</h2>
+                    <p>Detailed analysis of AI improvements over time</p>
+                </div>
+                
+                <div class="analytics-summary">
+                    <div class="summary-card">
+                        <div class="summary-icon">🎯</div>
+                        <div class="summary-content">
+                            <div class="summary-title">Average Accuracy Gain</div>
+                            <div class="summary-value" id="avgAccuracyGain">+0m</div>
+                            <div class="summary-trend" id="accuracyTrend">No data yet</div>
+                        </div>
+                    </div>
+                    
+                    <div class="summary-card">
+                        <div class="summary-icon">🤖</div>
+                        <div class="summary-content">
+                            <div class="summary-title">AI Confidence Score</div>
+                            <div class="summary-value" id="avgAiConfidence">0%</div>
+                            <div class="summary-trend" id="confidenceTrend">No data yet</div>
+                        </div>
+                    </div>
+                    
+                    <div class="summary-card">
+                        <div class="summary-icon">⚡</div>
+                        <div class="summary-content">
+                            <div class="summary-title">Total Corrections</div>
+                            <div class="summary-value" id="totalCorrections">0</div>
+                            <div class="summary-trend" id="correctionsTrend">AI improvements applied</div>
+                        </div>
+                    </div>
+                    
+                    <div class="summary-card">
+                        <div class="summary-icon">🚶</div>
+                        <div class="summary-content">
+                            <div class="summary-title">Movement Analysis</div>
+                            <div class="summary-value" id="movementAccuracy">0%</div>
+                            <div class="summary-trend" id="movementTrend">Pattern recognition rate</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="analytics-charts">
+                    <div class="chart-container">
+                        <h3>📈 Accuracy Improvement Over Time</h3>
+                        <canvas id="accuracyChart" width="400" height="150"></canvas>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <h3>🤖 AI Confidence Trends</h3>
+                        <canvas id="confidenceChart" width="400" height="150"></canvas>
+                    </div>
+                </div>
+                
+                <div class="detailed-analytics">
+                    <div class="analytics-section">
+                        <h3>🎯 Location Processing Breakdown</h3>
+                        <div class="breakdown-grid">
+                            <div class="breakdown-item">
+                                <div class="breakdown-label">Raw GPS Points</div>
+                                <div class="breakdown-value" id="rawGpsCount">0</div>
+                            </div>
+                            <div class="breakdown-item">
+                                <div class="breakdown-label">AI-Enhanced Points</div>
+                                <div class="breakdown-value" id="aiEnhancedCount">0</div>
+                            </div>
+                            <div class="breakdown-item">
+                                <div class="breakdown-label">Accuracy Improvements</div>
+                                <div class="breakdown-value" id="improvementCount">0</div>
+                            </div>
+                            <div class="breakdown-item">
+                                <div class="breakdown-label">Anomalies Detected</div>
+                                <div class="breakdown-value" id="anomaliesDetected">0</div>
+                            </div>
+                            <div class="breakdown-item">
+                                <div class="breakdown-label">False Positives Prevented</div>
+                                <div class="breakdown-value" id="falsePositivesPrevented">0</div>
+                            </div>
+                            <div class="breakdown-item">
+                                <div class="breakdown-label">Average Processing Time</div>
+                                <div class="breakdown-value" id="avgProcessingTime">0ms</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -184,6 +387,7 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

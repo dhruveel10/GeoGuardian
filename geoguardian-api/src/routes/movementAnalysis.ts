@@ -5,7 +5,7 @@ import { MovementAnalysisRequest, MovementAnalysisResponse } from '../types/move
 
 const router = express.Router();
 
-router.post('/analyze-movement', (req, res) => {
+router.post('/analyze-movement', async (req, res) => {
   const startTime = Date.now();
   
   try {
@@ -40,7 +40,7 @@ router.post('/analyze-movement', (req, res) => {
     const sanitizedPrevious = LocationValidator.sanitize(previousLocation);
     const sanitizedCurrent = LocationValidator.sanitize(currentLocation);
 
-    const analysisResult = MovementAnomalyAnalyzer.analyzeMovement({
+    const analysisResult = await MovementAnomalyAnalyzer.analyzeMovementWithAI({
       previousLocation: sanitizedPrevious,
       currentLocation: sanitizedCurrent,
       maxReasonableSpeed,
