@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:5001/api/v1';
+const API_BASE = 'https://geoguardian-pa0d.onrender.com/api/v1';
 
 let map;
 let currentLocationMarker;
