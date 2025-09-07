@@ -751,21 +751,32 @@ body {
 
 .analytics-charts {
     margin-bottom: 40px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: space-between;
 }
 
 .chart-container {
     background: white;
     border-radius: 16px;
-    padding: 25px;
+    padding: 15px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     border: 1px solid #e2e8f0;
     margin-bottom: 25px;
+    max-width: 500px;
+    height: 200px;
 }
 
 .chart-container h3 {
-    margin: 0 0 20px 0;
+    margin: 0 0 10px 0;
     color: #1f2937;
-    font-size: 1.3rem;
+    font-size: 1.1rem;
+}
+
+.chart-container canvas {
+    max-height: 150px !important;
+    height: 150px !important;
 }
 
 .detailed-analytics {

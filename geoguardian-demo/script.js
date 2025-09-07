@@ -104,12 +104,20 @@ function initAnalyticsCharts() {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: {
+                    duration: 0
+                },
+                elements: {
+                    point: {
+                        radius: 2
+                    }
+                },
                 scales: {
                     y: {
                         beginAtZero: true,
                         title: {
                             display: true,
-                            text: 'Accuracy (meters)'
+                            text: 'Accuracy (m)'
                         }
                     }
                 }
@@ -135,6 +143,14 @@ function initAnalyticsCharts() {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: {
+                    duration: 0
+                },
+                elements: {
+                    point: {
+                        radius: 2
+                    }
+                },
                 scales: {
                     y: {
                         beginAtZero: true,
@@ -505,7 +521,7 @@ function updateAnalyticsData(rawLocation, processedLocation, results, processing
         accuracyChart.data.datasets[0].data.push(rawLocation.accuracy);
         accuracyChart.data.datasets[1].data.push(processedLocation.accuracy);
 
-        if (accuracyChart.data.labels.length > 20) {
+        if (accuracyChart.data.labels.length > 10) {
             accuracyChart.data.labels.shift();
             accuracyChart.data.datasets[0].data.shift();
             accuracyChart.data.datasets[1].data.shift();
@@ -519,7 +535,7 @@ function updateAnalyticsData(rawLocation, processedLocation, results, processing
         confidenceChart.data.labels.push(label);
         confidenceChart.data.datasets[0].data.push(results.ai.confidence * 100);
 
-        if (confidenceChart.data.labels.length > 20) {
+        if (confidenceChart.data.labels.length > 10) {
             confidenceChart.data.labels.shift();
             confidenceChart.data.datasets[0].data.shift();
         }
