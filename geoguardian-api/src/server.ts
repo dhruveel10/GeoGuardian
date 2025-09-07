@@ -12,12 +12,17 @@ import aiRoutes from './routes/aiAnalysis';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5001;
 
 app.use(helmet({
   contentSecurityPolicy: false 
 }));
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5173', 'http://127.0.0.1:5173'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Access-Control-Allow-Origin'],
+  credentials: true
+}));
 app.use(morgan('combined'));
 app.use(express.json());
 app.use(express.static('public'));

@@ -3,180 +3,493 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoGuardian Smart Geofencing Demo</title>
+    <title>GeoGuardian AI-Enhanced Demo</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🛡️ GeoGuardian Smart Geofencing</h1>
-            <p>Intelligent Location Processing with Visual Geofence Analysis</p>
+            <h1>🛡️ GeoGuardian AI-Enhanced Geofencing</h1>
+            <p>Intelligent Location Processing with Advanced AI Analysis & Comparison</p>
         </div>
 
-        <div class="demo-grid">
-            <div class="map-container">
-                <div class="map-overlay">
-                    <h4 style="margin: 0 0 10px 0;">📊 Live Status</h4>
-                    <div id="liveStatus" class="status-indicator status-info">
-                        Ready to start demo
-                    </div>
-                    <div class="metrics-grid">
-                        <div class="metric-card">
-                            <div class="metric-value" id="currentAccuracy">--</div>
-                            <div class="metric-label">Accuracy (m)</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-value" id="currentConfidence">--</div>
-                            <div class="metric-label">Confidence</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-value" id="currentPlatform">--</div>
-                            <div class="metric-label">Platform</div>
-                        </div>
-                        <div class="metric-card">
-                            <div class="metric-value" id="processingTime">--</div>
-                            <div class="metric-label">Process (ms)</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="legend">
-                    <h4 style="margin: 0 0 8px 0; font-size: 14px;">Map Legend</h4>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #dc2626;"></div>
-                        <span>Raw GPS Point</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #10b981;"></div>
-                        <span>Processed Point</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #3b82f6;"></div>
-                        <span>Geofence Center</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #10b981; opacity: 0.4;"></div>
-                        <span>✅ Inside Zone</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #3b82f6; opacity: 0.4;"></div>
-                        <span>🔄 Main Geofence</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #fbbf24; opacity: 0.4;"></div>
-                        <span>❓ Uncertainty Zone</span>
-                    </div>
-                </div>
-
-                <div id="map"></div>
+        <div class="demo-tabs">
+            <div class="tab-buttons">
+                <button class="tab-btn active" data-tab="live-demo">🎯 Live Demo</button>
+                <button class="tab-btn" data-tab="ai-comparison">🤖 AI Comparison</button>
+                <button class="tab-btn" data-tab="analytics">📊 Analytics</button>
+                <button class="tab-btn" data-tab="endpoints">🔧 API Explorer</button>
             </div>
+        </div>
 
-            <div class="control-panel">
-                <div class="section">
-                    <h3>🎯 Geofence Setup</h3>
-                    <div class="form-group">
-                        <label for="geofenceName">Geofence Name:</label>
-                        <input type="text" id="geofenceName" value="Test Building" placeholder="Enter geofence name">
+        <div id="live-demo" class="tab-content active">
+            <div class="demo-grid">
+                <div class="map-container">
+                    <div class="map-overlay">
+                        <div class="status-header">
+                            <h4 style="margin: 0 0 10px 0;">📊 Live Status</h4>
+                            <div class="ai-indicator" id="aiIndicator">
+                                <span class="ai-badge">🤖 AI Enhanced</span>
+                            </div>
+                        </div>
+                        <div id="liveStatus" class="status-indicator status-info">
+                            Ready to start demo
+                        </div>
+                        <div class="metrics-grid">
+                            <div class="metric-card">
+                                <div class="metric-value" id="currentAccuracy">--</div>
+                                <div class="metric-label">Accuracy (m)</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" id="currentConfidence">--</div>
+                                <div class="metric-label">AI Confidence</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" id="currentPlatform">--</div>
+                                <div class="metric-label">Platform</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" id="processingTime">--</div>
+                                <div class="metric-label">Process (ms)</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" id="aiScore">--</div>
+                                <div class="metric-label">AI Score</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-value" id="improvementGain">--</div>
+                                <div class="metric-label">Improvement</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="geofenceRadius">Radius (meters):</label>
-                        <input type="number" id="geofenceRadius" value="100" min="10" max="1000">
+
+                    <div class="legend">
+                        <h4 style="margin: 0 0 8px 0; font-size: 14px;">Map Legend</h4>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #dc2626;"></div>
+                            <span>Raw GPS Point</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #10b981;"></div>
+                            <span>AI Enhanced Point</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #3b82f6;"></div>
+                            <span>Geofence Center</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #10b981; opacity: 0.4;"></div>
+                            <span>✅ Inside Zone</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #3b82f6; opacity: 0.4;"></div>
+                            <span>🔄 Main Geofence</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #fbbf24; opacity: 0.4;"></div>
+                            <span>❓ Uncertainty Zone</span>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="bufferStrategy">Buffer Strategy:</label>
-                        <select id="bufferStrategy">
-                            <option value="conservative">Conservative</option>
-                            <option value="moderate" selected>Moderate</option>
-                            <option value="aggressive">Aggressive</option>
-                        </select>
-                    </div>
-                    <button class="button" id="createGeofence" disabled>📍 Click Map to Create Geofence</button>
+
+                    <div id="map"></div>
                 </div>
 
-                <div class="section">
-                    <h3>⚙️ Processing Options</h3>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="enableFusion" checked>
-                        <label for="enableFusion">Enable Location Fusion</label>
+                <div class="control-panel">
+                    <div class="section">
+                        <h3>🎯 Geofence Setup</h3>
+                        <div class="form-group">
+                            <label for="geofenceName">Geofence Name:</label>
+                            <input type="text" id="geofenceName" value="Test Building" placeholder="Enter geofence name">
+                        </div>
+                        <div class="form-group">
+                            <label for="geofenceRadius">Radius (meters):</label>
+                            <input type="number" id="geofenceRadius" value="100" min="10" max="1000">
+                        </div>
+                        <div class="form-group">
+                            <label for="bufferStrategy">Buffer Strategy:</label>
+                            <select id="bufferStrategy">
+                                <option value="conservative">Conservative</option>
+                                <option value="moderate" selected>Moderate</option>
+                                <option value="aggressive">Aggressive</option>
+                            </select>
+                        </div>
+                        <button class="button" id="createGeofence" disabled>📍 Click Map to Create Geofence</button>
                     </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="enableMovementAnalysis" checked>
-                        <label for="enableMovementAnalysis">Movement Analysis</label>
+
+                    <div class="section">
+                        <h3>⚙️ Processing Options</h3>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="enableFusion" checked>
+                            <label for="enableFusion">Enable Location Fusion</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="enableMovementAnalysis" checked>
+                            <label for="enableMovementAnalysis">Movement Analysis</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="enableKalman">
+                            <label for="enableKalman">Kalman Filtering</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="enableAI" checked>
+                            <label for="enableAI">🤖 AI Enhancement</label>
+                        </div>
+                        <div class="form-group">
+                            <label for="simulateDevice">Simulate Device:</label>
+                            <select id="simulateDevice">
+                                <option value="auto">Auto-detect</option>
+                                <option value="ios">iOS Device</option>
+                                <option value="android">Android Device</option>
+                                <option value="web">Web Browser</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="enableKalman">
-                        <label for="enableKalman">Kalman Filtering</label>
+
+                    <div class="section">
+                        <h3>🚀 Demo Controls</h3>
+                        <button class="button" id="requestLocation">📍 Request Location Access</button>
+                        <button class="button success" id="startDemo" disabled>▶️ Start AI Tracking</button>
+                        <button class="button danger" id="stopDemo" disabled>⏹️ Stop Demo</button>
+                        <button class="button" id="clearMap">🗑️ Clear Map</button>
                     </div>
-                    <div class="form-group">
-                        <label for="simulateDevice">Simulate Device:</label>
-                        <select id="simulateDevice">
-                            <option value="auto">Auto-detect</option>
-                            <option value="ios">iOS Device</option>
-                            <option value="android">Android Device</option>
-                            <option value="web">Web Browser</option>
-                        </select>
+
+                    <div class="section">
+                        <h3>🔄 AI Processing Pipeline</h3>
+                        <div class="processing-pipeline">
+                            <div class="pipeline-step" id="step1">
+                                <span>1️⃣</span>
+                                <span>GPS Collection</span>
+                            </div>
+                            <div class="pipeline-step" id="step2">
+                                <span>2️⃣</span>
+                                <span>AI Quality Analysis</span>
+                            </div>
+                            <div class="pipeline-step" id="step3">
+                                <span>3️⃣</span>
+                                <span>Smart Fusion</span>
+                            </div>
+                            <div class="pipeline-step" id="step4">
+                                <span>4️⃣</span>
+                                <span>AI Movement Analysis</span>
+                            </div>
+                            <div class="pipeline-step" id="step5">
+                                <span>5️⃣</span>
+                                <span>AI Geofence Evaluation</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h3>📊 Data Processing Comparison</h3>
+                        <div class="comparison-panels">
+                            <div class="comparison-panel panel-raw">
+                                <strong>📍 Raw GPS</strong>
+                                <div id="rawData">No data yet</div>
+                            </div>
+                            <div class="comparison-panel panel-processed">
+                                <strong>✨ AI Enhanced</strong>
+                                <div id="processedData">No data yet</div>
+                            </div>
+                            <div class="comparison-panel panel-ai">
+                                <strong>🤖 AI Analysis</strong>
+                                <div id="aiAnalysis">No analysis yet</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h3>🧠 AI Insights</h3>
+                        <div class="ai-insights" id="aiInsights">
+                            <div class="insight-card">
+                                <div class="insight-icon">🎯</div>
+                                <div class="insight-content">
+                                    <div class="insight-title">Location Quality</div>
+                                    <div class="insight-desc" id="qualityInsight">Analyzing...</div>
+                                </div>
+                            </div>
+                            <div class="insight-card">
+                                <div class="insight-icon">🚶</div>
+                                <div class="insight-content">
+                                    <div class="insight-title">Movement Pattern</div>
+                                    <div class="insight-desc" id="movementInsight">Analyzing...</div>
+                                </div>
+                            </div>
+                            <div class="insight-card">
+                                <div class="insight-icon">🛡️</div>
+                                <div class="insight-content">
+                                    <div class="insight-title">Geofence Optimization</div>
+                                    <div class="insight-desc" id="geofenceInsight">Analyzing...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h3>🎯 Geofence Results</h3>
+                        <div class="geofence-results" id="geofenceResults">
+                            No geofences created yet
+                        </div>
+                    </div>
+
+                    <div class="logs" id="logs">
+                        <div class="log-entry">
+                            <span class="log-timestamp">[Ready]</span> GeoGuardian AI-Enhanced Demo initialized
+                        </div>
                     </div>
                 </div>
+            </div>
+        </div>
 
-                <div class="section">
-                    <h3>🚀 Demo Controls</h3>
-                    <button class="button" id="requestLocation">📍 Request Location Access</button>
-                    <button class="button success" id="startDemo" disabled>▶️ Start Smart Tracking</button>
-                    <button class="button danger" id="stopDemo" disabled>⏹️ Stop Demo</button>
-                    <button class="button" id="clearMap">🗑️ Clear Map</button>
+        <div id="ai-comparison" class="tab-content">
+            <div class="comparison-dashboard">
+                <div class="comparison-header">
+                    <h2>🤖 AI vs Traditional Processing</h2>
+                    <p>Real-time comparison of traditional geofencing vs AI-enhanced processing</p>
                 </div>
-
-                <div class="section">
-                    <h3>🔄 Processing Pipeline</h3>
-                    <div class="processing-pipeline">
-                        <div class="pipeline-step" id="step1">
-                            <span>1️⃣</span>
-                            <span>Collect GPS Reading</span>
+                
+                <div class="comparison-grid">
+                    <div class="comparison-section">
+                        <div class="section-header">
+                            <h3>📍 Traditional Processing</h3>
+                            <div class="process-indicator traditional">Standard GPS</div>
                         </div>
-                        <div class="pipeline-step" id="step2">
-                            <span>2️⃣</span>
-                            <span>Quality Analysis</span>
+                        <div class="process-visualization" id="traditionalViz">
+                            <div class="process-step">
+                                <span class="step-number">1</span>
+                                <span class="step-name">Raw GPS Collection</span>
+                                <div class="step-result" id="traditionalStep1">--</div>
+                            </div>
+                            <div class="process-step">
+                                <span class="step-number">2</span>
+                                <span class="step-name">Basic Filtering</span>
+                                <div class="step-result" id="traditionalStep2">--</div>
+                            </div>
+                            <div class="process-step">
+                                <span class="step-number">3</span>
+                                <span class="step-name">Geofence Check</span>
+                                <div class="step-result" id="traditionalStep3">--</div>
+                            </div>
                         </div>
-                        <div class="pipeline-step" id="step3">
-                            <span>3️⃣</span>
-                            <span>Location Fusion</span>
+                    </div>
+                    
+                    <div class="comparison-section">
+                        <div class="section-header">
+                            <h3>🤖 AI-Enhanced Processing</h3>
+                            <div class="process-indicator ai-enhanced">AI Powered</div>
                         </div>
-                        <div class="pipeline-step" id="step4">
-                            <span>4️⃣</span>
-                            <span>Movement Analysis</span>
-                        </div>
-                        <div class="pipeline-step" id="step5">
-                            <span>5️⃣</span>
-                            <span>Geofence Evaluation</span>
+                        <div class="process-visualization" id="aiViz">
+                            <div class="process-step">
+                                <span class="step-number">1</span>
+                                <span class="step-name">AI Location Validation</span>
+                                <div class="step-result" id="aiStep1">--</div>
+                            </div>
+                            <div class="process-step">
+                                <span class="step-number">2</span>
+                                <span class="step-name">Smart Fusion & Analysis</span>
+                                <div class="step-result" id="aiStep2">--</div>
+                            </div>
+                            <div class="process-step">
+                                <span class="step-number">3</span>
+                                <span class="step-name">AI Movement Detection</span>
+                                <div class="step-result" id="aiStep3">--</div>
+                            </div>
+                            <div class="process-step">
+                                <span class="step-number">4</span>
+                                <span class="step-name">Optimized Geofencing</span>
+                                <div class="step-result" id="aiStep4">--</div>
+                            </div>
                         </div>
                     </div>
                 </div>
-
-                <div class="section">
-                    <h3>📊 Raw vs Processed</h3>
-                    <div class="comparison-panels">
-                        <div class="comparison-panel panel-raw">
-                            <strong>📍 Raw GPS</strong>
-                            <div id="rawData">No data yet</div>
+                
+                <div class="performance-metrics">
+                    <h3>📈 Performance Metrics</h3>
+                    <div class="metrics-comparison">
+                        <div class="metric-comparison">
+                            <div class="metric-name">Accuracy Improvement</div>
+                            <div class="metric-bar">
+                                <div class="metric-fill" id="accuracyBar">0%</div>
+                            </div>
+                            <div class="metric-value" id="accuracyImprovement">0%</div>
                         </div>
-                        <div class="comparison-panel panel-processed">
-                            <strong>✨ Processed</strong>
-                            <div id="processedData">No data yet</div>
+                        <div class="metric-comparison">
+                            <div class="metric-name">False Positive Reduction</div>
+                            <div class="metric-bar">
+                                <div class="metric-fill" id="falsePositiveBar">0%</div>
+                            </div>
+                            <div class="metric-value" id="falsePositiveReduction">0%</div>
+                        </div>
+                        <div class="metric-comparison">
+                            <div class="metric-name">Processing Efficiency</div>
+                            <div class="metric-bar">
+                                <div class="metric-fill" id="efficiencyBar">0%</div>
+                            </div>
+                            <div class="metric-value" id="processingEfficiency">0%</div>
                         </div>
                     </div>
                 </div>
-
-                <div class="section">
-                    <h3>🎯 Geofence Results</h3>
-                    <div class="geofence-results" id="geofenceResults">
-                        No geofences created yet
+            </div>
+        </div>
+        
+        <div id="analytics" class="tab-content">
+            <div class="analytics-dashboard">
+                <div class="analytics-header">
+                    <h2>📊 Real-time Analytics Dashboard</h2>
+                    <p>Comprehensive analysis of location processing and AI performance</p>
+                </div>
+                
+                <div class="analytics-grid">
+                    <div class="analytics-card">
+                        <h3>🎯 Location Quality Trends</h3>
+                        <div class="chart-container">
+                            <canvas id="qualityChart" width="300" height="150"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="analytics-card">
+                        <h3>🚶 Movement Analysis</h3>
+                        <div class="movement-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Average Speed</span>
+                                <span class="stat-value" id="avgSpeed">-- km/h</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Distance Covered</span>
+                                <span class="stat-value" id="totalDistance">-- m</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Anomalies Detected</span>
+                                <span class="stat-value" id="anomaliesCount">--</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="analytics-card">
+                        <h3>🤖 AI Performance</h3>
+                        <div class="ai-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">AI Confidence</span>
+                                <span class="stat-value" id="aiConfidenceAvg">--%</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Corrections Applied</span>
+                                <span class="stat-value" id="correctionsCount">--</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Processing Time</span>
+                                <span class="stat-value" id="avgProcessingTime">-- ms</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="analytics-card wide">
+                        <h3>🛡️ Geofence Activity</h3>
+                        <div class="geofence-timeline" id="geofenceTimeline">
+                            <div class="timeline-item">
+                                <div class="timeline-time">No activity yet</div>
+                                <div class="timeline-event">Start demo to see geofence events</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-
-                <div class="logs" id="logs">
-                    <div class="log-entry">
-                        <span class="log-timestamp">[Ready]</span> GeoGuardian Smart Geofencing Demo initialized
+            </div>
+        </div>
+        
+        <div id="endpoints" class="tab-content">
+            <div class="api-explorer">
+                <div class="explorer-header">
+                    <h2>🔧 API Endpoint Explorer</h2>
+                    <p>Test all GeoGuardian API endpoints with live data</p>
+                </div>
+                
+                <div class="endpoints-grid">
+                    <div class="endpoint-card">
+                        <div class="endpoint-header">
+                            <h3>📍 Location Analysis</h3>
+                            <span class="endpoint-method">POST</span>
+                        </div>
+                        <div class="endpoint-url">/api/v1/location/test</div>
+                        <div class="endpoint-desc">Analyze GPS location quality and accuracy</div>
+                        <button class="endpoint-btn" onclick="testLocationEndpoint()">Test Endpoint</button>
+                        <div class="endpoint-result" id="locationResult"></div>
+                    </div>
+                    
+                    <div class="endpoint-card">
+                        <div class="endpoint-header">
+                            <h3>🤖 AI Location Validation</h3>
+                            <span class="endpoint-method ai">POST</span>
+                        </div>
+                        <div class="endpoint-url">/api/v1/ai/validate-location</div>
+                        <div class="endpoint-desc">AI-powered location plausibility validation</div>
+                        <button class="endpoint-btn" onclick="testAIValidationEndpoint()">Test AI Endpoint</button>
+                        <div class="endpoint-result" id="aiValidationResult"></div>
+                    </div>
+                    
+                    <div class="endpoint-card">
+                        <div class="endpoint-header">
+                            <h3>🔗 Location Fusion</h3>
+                            <span class="endpoint-method">POST</span>
+                        </div>
+                        <div class="endpoint-url">/api/v1/fusion/fused</div>
+                        <div class="endpoint-desc">Combine multiple GPS readings for better accuracy</div>
+                        <button class="endpoint-btn" onclick="testFusionEndpoint()">Test Endpoint</button>
+                        <div class="endpoint-result" id="fusionResult"></div>
+                    </div>
+                    
+                    <div class="endpoint-card">
+                        <div class="endpoint-header">
+                            <h3>⚖️ Fusion Comparison</h3>
+                            <span class="endpoint-method">POST</span>
+                        </div>
+                        <div class="endpoint-url">/api/v1/fusion/compare</div>
+                        <div class="endpoint-desc">Compare raw vs fused location data</div>
+                        <button class="endpoint-btn" onclick="testFusionCompareEndpoint()">Test Endpoint</button>
+                        <div class="endpoint-result" id="fusionCompareResult"></div>
+                    </div>
+                    
+                    <div class="endpoint-card">
+                        <div class="endpoint-header">
+                            <h3>🚶 Movement Analysis</h3>
+                            <span class="endpoint-method">POST</span>
+                        </div>
+                        <div class="endpoint-url">/api/v1/location/analyze-movement</div>
+                        <div class="endpoint-desc">Detect movement anomalies and impossible speeds</div>
+                        <button class="endpoint-btn" onclick="testMovementEndpoint()">Test Endpoint</button>
+                        <div class="endpoint-result" id="movementResult"></div>
+                    </div>
+                    
+                    <div class="endpoint-card">
+                        <div class="endpoint-header">
+                            <h3>🧠 AI Anomaly Explanation</h3>
+                            <span class="endpoint-method ai">POST</span>
+                        </div>
+                        <div class="endpoint-url">/api/v1/ai/explain-anomaly</div>
+                        <div class="endpoint-desc">Get AI explanations for movement anomalies</div>
+                        <button class="endpoint-btn" onclick="testAIAnomalyEndpoint()">Test AI Endpoint</button>
+                        <div class="endpoint-result" id="aiAnomalyResult"></div>
+                    </div>
+                    
+                    <div class="endpoint-card">
+                        <div class="endpoint-header">
+                            <h3>🎯 Geofence Evaluation</h3>
+                            <span class="endpoint-method">POST</span>
+                        </div>
+                        <div class="endpoint-url">/api/v1/geofence/evaluate</div>
+                        <div class="endpoint-desc">Smart geofence boundary checking with AI</div>
+                        <button class="endpoint-btn" onclick="testGeofenceEndpoint()">Test Endpoint</button>
+                        <div class="endpoint-result" id="geofenceResult"></div>
+                    </div>
+                    
+                    <div class="endpoint-card">
+                        <div class="endpoint-header">
+                            <h3>🛠️ AI Geofence Optimization</h3>
+                            <span class="endpoint-method ai">POST</span>
+                        </div>
+                        <div class="endpoint-url">/api/v1/ai/optimize-geofence</div>
+                        <div class="endpoint-desc">AI recommendations for geofence optimization</div>
+                        <button class="endpoint-btn" onclick="testAIGeofenceEndpoint()">Test AI Endpoint</button>
+                        <div class="endpoint-result" id="aiGeofenceResult"></div>
                     </div>
                 </div>
             </div>
@@ -184,6 +497,7 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
