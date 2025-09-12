@@ -6,6 +6,9 @@
 
 GeoGuardian is a production-ready location processing API that solves GPS accuracy and reliability problems in location-based applications. It provides intelligent location validation, fusion algorithms, movement anomaly detection, and smart geofencing capabilities with platform-specific optimizations.
 
+## Demo
+https://geo-guardian-99dyxisjy-dhruveel10s-projects.vercel.app/
+
 ## 🚀 Key Features
 
 ### Core Location Intelligence
